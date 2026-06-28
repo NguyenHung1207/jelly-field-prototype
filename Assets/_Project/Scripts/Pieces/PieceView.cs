@@ -98,6 +98,35 @@ public class PieceView : MonoBehaviour
         highlightRenderers[slot] = renderer;
     }
 
+    public void PlayMatchDisappearEffect(MiniSlot slot, ColorId color)
+    {
+        if (color == ColorId.None)
+            return;
+
+        if (!miniCubeRenderers.TryGetValue(slot, out Renderer sourceRenderer))
+            return;
+
+        GameObject ghost = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        ghost.name = $"MatchDisappear_{color}_{slot}";
+
+        Transform sourceTransform = sourceRenderer.transform;
+
+        ghost.transform.position = sourceTransform.position;
+        ghost.transform.rotation = sourceTransform.rotation;
+        ghost.transform.localScale = sourceTransform.lossyScale;
+
+        Collider ghostCollider = ghost.GetComponent<Collider>();
+        if (ghostCollider != null)
+        {
+            Destroy(ghostCollider);
+        }
+
+        Renderer ghostRenderer = ghost.GetComponent<Renderer>();
+        ghostRenderer.sharedMaterial = RuntimeMaterialLibrary.Get(color);
+
+        MatchDisappearEffect effect = ghost.AddComponent<MatchDisappearEffect>();
+        effect.Play();
+    }
     private void EnsureRootCollider()
     {
         BoxCollider boxCollider = GetComponent<BoxCollider>();

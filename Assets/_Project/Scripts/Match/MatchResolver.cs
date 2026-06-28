@@ -236,6 +236,8 @@ public class MatchResolver
 
         foreach (MatchedMiniCell match in matches)
         {
+            match.Piece.PlayMatchDisappearEffect(match.Slot, match.Color);
+
             match.Piece.Data.Set(match.Slot, ColorId.None);
             affectedPieces.Add(match.Piece);
         }
