@@ -1,9 +1,14 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class LevelManager : MonoBehaviour
 {
     public static LevelManager Instance { get; private set; }
+
+    public event Action OnScoreChanged;
+    public event Action OnLevelCompleted;
+    public event Action OnLevelFailed;
 
     [Header("Level Target")]
     [SerializeField] private TargetGoal[] targetGoals =
@@ -26,6 +31,11 @@ public class LevelManager : MonoBehaviour
 
         Instance = this;
         InitializeTargets();
+    }
+
+    private void Start()
+    {
+        OnScoreChanged?.Invoke();
     }
 
     private void InitializeTargets()
@@ -80,6 +90,7 @@ public class LevelManager : MonoBehaviour
         }
 
         LogTargetProgress();
+        OnScoreChanged?.Invoke();
 
         if (IsWinConditionMet())
         {
@@ -92,6 +103,16 @@ public class LevelManager : MonoBehaviour
         return requiredScores.ContainsKey(color);
     }
 
+    public IReadOnlyDictionary<ColorId, int> GetRequiredScores()
+    {
+        return requiredScores;
+    }
+
+    public IReadOnlyDictionary<ColorId, int> GetCurrentScores()
+    {
+        return currentScores;
+    }
+
     public void LoseLevel()
     {
         if (IsLevelEnded)
@@ -99,6 +120,7 @@ public class LevelManager : MonoBehaviour
 
         IsLevelEnded = true;
         Debug.Log("LEVEL FAILED: Board is full and targets are not completed.");
+        OnLevelFailed?.Invoke();
     }
 
     private bool IsWinConditionMet()
@@ -125,6 +147,7 @@ public class LevelManager : MonoBehaviour
 
         IsLevelEnded = true;
         Debug.Log("LEVEL COMPLETE!");
+        OnLevelCompleted?.Invoke();
     }
 
     private void LogTargetProgress()
