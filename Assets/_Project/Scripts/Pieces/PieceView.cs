@@ -4,6 +4,7 @@ using UnityEngine;
 public class PieceView : MonoBehaviour
 {
     private readonly Dictionary<MiniSlot, Renderer> miniCubeRenderers = new Dictionary<MiniSlot, Renderer>();
+    private readonly Dictionary<MiniSlot, Renderer> highlightRenderers = new Dictionary<MiniSlot, Renderer>();
 
     public PieceData Data { get; private set; }
 
@@ -13,10 +14,10 @@ public class PieceView : MonoBehaviour
 
         ClearChildren();
 
-        CreateMiniCube(MiniSlot.TopLeft, new Vector3(-0.25f, 0f, 0.25f));
-        CreateMiniCube(MiniSlot.TopRight, new Vector3(0.25f, 0f, 0.25f));
-        CreateMiniCube(MiniSlot.BottomLeft, new Vector3(-0.25f, 0f, -0.25f));
-        CreateMiniCube(MiniSlot.BottomRight, new Vector3(0.25f, 0f, -0.25f));
+        CreateMiniJellyBlock(MiniSlot.TopLeft, new Vector3(-0.25f, 0f, 0.25f));
+        CreateMiniJellyBlock(MiniSlot.TopRight, new Vector3(0.25f, 0f, 0.25f));
+        CreateMiniJellyBlock(MiniSlot.BottomLeft, new Vector3(-0.25f, 0f, -0.25f));
+        CreateMiniJellyBlock(MiniSlot.BottomRight, new Vector3(0.25f, 0f, -0.25f));
 
         EnsureRootCollider();
         Refresh();
@@ -26,26 +27,39 @@ public class PieceView : MonoBehaviour
     {
         foreach (KeyValuePair<MiniSlot, Renderer> pair in miniCubeRenderers)
         {
-            ColorId colorId = Data.Get(pair.Key);
+            MiniSlot slot = pair.Key;
+            ColorId colorId = Data.Get(slot);
 
             GameObject miniCubeObject = pair.Value.gameObject;
-            miniCubeObject.SetActive(colorId != ColorId.None);
+            bool hasColor = colorId != ColorId.None;
 
-            if (colorId != ColorId.None)
+            miniCubeObject.SetActive(hasColor);
+
+            if (highlightRenderers.TryGetValue(slot, out Renderer highlightRenderer))
+            {
+                highlightRenderer.gameObject.SetActive(hasColor);
+            }
+
+            if (hasColor)
             {
                 pair.Value.sharedMaterial = RuntimeMaterialLibrary.Get(colorId);
+
+                if (highlightRenderers.TryGetValue(slot, out Renderer highlight))
+                {
+                    highlight.sharedMaterial = RuntimeMaterialLibrary.GetHighlight();
+                }
             }
         }
     }
 
-    private void CreateMiniCube(MiniSlot slot, Vector3 localPosition)
+    private void CreateMiniJellyBlock(MiniSlot slot, Vector3 localPosition)
     {
         GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
         cube.name = slot.ToString();
 
         cube.transform.SetParent(transform, false);
         cube.transform.localPosition = localPosition;
-        cube.transform.localScale = new Vector3(0.48f, 0.25f, 0.48f);
+        cube.transform.localScale = new Vector3(0.48f, 0.45f, 0.48f);
 
         Collider childCollider = cube.GetComponent<Collider>();
         if (childCollider != null)
@@ -55,6 +69,33 @@ public class PieceView : MonoBehaviour
 
         Renderer renderer = cube.GetComponent<Renderer>();
         miniCubeRenderers[slot] = renderer;
+
+        CreateHighlight(slot, localPosition);
+    }
+
+    private void CreateHighlight(MiniSlot slot, Vector3 blockLocalPosition)
+    {
+        GameObject highlight = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        highlight.name = $"{slot}_Highlight";
+
+        highlight.transform.SetParent(transform, false);
+
+        Vector3 highlightOffset = new Vector3(-0.12f, 0.24f, -0.12f);
+        highlight.transform.localPosition = blockLocalPosition + highlightOffset;
+
+        highlight.transform.localScale = new Vector3(0.08f, 0.012f, 0.035f);
+        highlight.transform.localRotation = Quaternion.Euler(0f, 0f, -25f);
+
+        Collider collider = highlight.GetComponent<Collider>();
+        if (collider != null)
+        {
+            Destroy(collider);
+        }
+
+        Renderer renderer = highlight.GetComponent<Renderer>();
+        renderer.sharedMaterial = RuntimeMaterialLibrary.GetHighlight();
+
+        highlightRenderers[slot] = renderer;
     }
 
     private void EnsureRootCollider()
@@ -67,7 +108,7 @@ public class PieceView : MonoBehaviour
         }
 
         boxCollider.center = Vector3.zero;
-        boxCollider.size = new Vector3(1f, 0.5f, 1f);
+        boxCollider.size = new Vector3(1f, 0.65f, 1f);
     }
 
     private void ClearChildren()
@@ -78,5 +119,6 @@ public class PieceView : MonoBehaviour
         }
 
         miniCubeRenderers.Clear();
+        highlightRenderers.Clear();
     }
 }
