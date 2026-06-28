@@ -35,6 +35,9 @@ public class PieceSpawner : MonoBehaviour
         PieceView pieceView = pieceObject.AddComponent<PieceView>();
         pieceView.Build(CreatePieceData(spawnIndex));
 
+        JellyAnimator jellyAnimator = pieceObject.AddComponent<JellyAnimator>();
+        jellyAnimator.PlaySpawnAnimation();
+
         PieceDragController dragController = pieceObject.AddComponent<PieceDragController>();
         dragController.Init(boardManager, this);
 

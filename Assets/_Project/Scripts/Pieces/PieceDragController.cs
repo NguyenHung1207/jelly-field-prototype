@@ -5,6 +5,7 @@ public class PieceDragController : MonoBehaviour
     private BoardManager boardManager;
     private PieceSpawner pieceSpawner;
     private PieceView pieceView;
+    private JellyAnimator jellyAnimator;
 
     private Vector3 startPosition;
     private bool isPlaced;
@@ -13,7 +14,9 @@ public class PieceDragController : MonoBehaviour
     {
         this.boardManager = boardManager;
         this.pieceSpawner = pieceSpawner;
+
         pieceView = GetComponent<PieceView>();
+        jellyAnimator = GetComponent<JellyAnimator>();
 
         startPosition = transform.position;
     }
@@ -24,6 +27,11 @@ public class PieceDragController : MonoBehaviour
             return;
 
         startPosition = transform.position;
+
+        if (jellyAnimator != null)
+        {
+            jellyAnimator.SetDraggingVisual(true);
+        }
     }
 
     private void OnMouseDrag()
@@ -32,12 +40,22 @@ public class PieceDragController : MonoBehaviour
             return;
 
         MoveToPointerPosition();
+
+        if (boardManager != null)
+        {
+            boardManager.ShowPlacementPreview(transform.position);
+        }
     }
 
     private void OnMouseUp()
     {
         if (isPlaced)
             return;
+
+        if (boardManager != null)
+        {
+            boardManager.ClearPlacementPreview();
+        }
 
         bool placedSuccessfully = boardManager.TryPlacePiece(pieceView);
 
@@ -52,7 +70,15 @@ public class PieceDragController : MonoBehaviour
         }
         else
         {
-            transform.position = startPosition;
+            if (jellyAnimator != null)
+            {
+                jellyAnimator.SetDraggingVisual(false);
+                jellyAnimator.MoveTo(startPosition, 0.18f);
+            }
+            else
+            {
+                transform.position = startPosition;
+            }
         }
     }
 
@@ -60,6 +86,16 @@ public class PieceDragController : MonoBehaviour
     {
         isPlaced = true;
         enabled = false;
+
+        if (boardManager != null)
+        {
+            boardManager.ClearPlacementPreview();
+        }
+
+        if (jellyAnimator != null)
+        {
+            jellyAnimator.PlayPlaceAnimation();
+        }
     }
 
     private void MoveToPointerPosition()

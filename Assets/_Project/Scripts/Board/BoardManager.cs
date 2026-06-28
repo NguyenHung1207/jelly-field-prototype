@@ -15,6 +15,14 @@ public class BoardManager : MonoBehaviour
     private Transform boardRoot;
     private bool[,] validCells;
 
+    private readonly Dictionary<Vector2Int, Renderer> cellRenderers = new Dictionary<Vector2Int, Renderer>();
+
+    private Material normalCellMaterial;
+    private Material validPreviewMaterial;
+    private Material invalidPreviewMaterial;
+
+    private Vector2Int? currentPreviewCell;
+
     public float DragPlaneY => 0.35f;
 
     private void Awake()
@@ -27,6 +35,7 @@ public class BoardManager : MonoBehaviour
 
         Instance = this;
         matchResolver = new MatchResolver();
+        CreateRuntimeMaterials();
     }
 
     private void Start()
@@ -43,6 +52,37 @@ public class BoardManager : MonoBehaviour
         {
             spawner.Initialize(this);
         }
+    }
+
+    private void CreateRuntimeMaterials()
+    {
+        normalCellMaterial = CreateMaterial("Cell_Normal", new Color(0.28f, 0.28f, 0.32f));
+        validPreviewMaterial = CreateMaterial("Cell_Valid_Preview", new Color(0.25f, 0.75f, 0.35f));
+        invalidPreviewMaterial = CreateMaterial("Cell_Invalid_Preview", new Color(0.85f, 0.25f, 0.25f));
+    }
+
+    private Material CreateMaterial(string materialName, Color color)
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+
+        if (shader == null)
+        {
+            shader = Shader.Find("Standard");
+        }
+
+        Material material = new Material(shader);
+        material.name = materialName;
+
+        if (material.HasProperty("_BaseColor"))
+        {
+            material.SetColor("_BaseColor", color);
+        }
+        else
+        {
+            material.color = color;
+        }
+
+        return material;
     }
 
     private void ApplyLevelConfig()
@@ -97,6 +137,8 @@ public class BoardManager : MonoBehaviour
         boardRootObject.transform.SetParent(transform, false);
         boardRoot = boardRootObject.transform;
 
+        cellRenderers.Clear();
+
         for (int x = 0; x < width; x++)
         {
             for (int z = 0; z < height; z++)
@@ -112,13 +154,18 @@ public class BoardManager : MonoBehaviour
                 cell.transform.localScale = new Vector3(0.95f, 0.08f, 0.95f);
 
                 Renderer renderer = cell.GetComponent<Renderer>();
-                renderer.sharedMaterial = RuntimeMaterialLibrary.Get(ColorId.None);
+                renderer.sharedMaterial = normalCellMaterial;
+
+                Vector2Int coordinate = new Vector2Int(x, z);
+                cellRenderers[coordinate] = renderer;
             }
         }
     }
 
     public bool TryPlacePiece(PieceView pieceView)
     {
+        ClearPlacementPreview();
+
         if (pieceView == null)
             return false;
 
@@ -166,6 +213,40 @@ public class BoardManager : MonoBehaviour
         }
 
         return true;
+    }
+
+    public void ShowPlacementPreview(Vector3 worldPosition)
+    {
+        ClearPlacementPreview();
+
+        int x = Mathf.RoundToInt(worldPosition.x / cellSize);
+        int z = Mathf.RoundToInt(worldPosition.z / cellSize);
+
+        if (!boardModel.IsInsideBounds(x, z))
+            return;
+
+        Vector2Int coordinate = new Vector2Int(x, z);
+
+        if (!cellRenderers.TryGetValue(coordinate, out Renderer cellRenderer))
+            return;
+
+        bool canPlace = boardModel.CanPlace(x, z);
+        cellRenderer.sharedMaterial = canPlace ? validPreviewMaterial : invalidPreviewMaterial;
+
+        currentPreviewCell = coordinate;
+    }
+
+    public void ClearPlacementPreview()
+    {
+        if (!currentPreviewCell.HasValue)
+            return;
+
+        if (cellRenderers.TryGetValue(currentPreviewCell.Value, out Renderer cellRenderer))
+        {
+            cellRenderer.sharedMaterial = normalCellMaterial;
+        }
+
+        currentPreviewCell = null;
     }
 
     public bool TryGetGridPositionFromWorld(Vector3 worldPosition, out int x, out int z)
