@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class BoardManager : MonoBehaviour
@@ -90,7 +91,17 @@ public class BoardManager : MonoBehaviour
 
         Debug.Log($"Placed piece at ({x}, {z})");
 
-        matchResolver.Resolve(boardModel);
+        Dictionary<ColorId, int> scoreByColor = matchResolver.Resolve(boardModel);
+
+        if (LevelManager.Instance != null)
+        {
+            LevelManager.Instance.AddScores(scoreByColor);
+
+            if (!LevelManager.Instance.IsLevelEnded && boardModel.IsFull())
+            {
+                LevelManager.Instance.LoseLevel();
+            }
+        }
 
         return true;
     }

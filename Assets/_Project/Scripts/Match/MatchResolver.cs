@@ -5,10 +5,12 @@ public class MatchResolver
 {
     private const int MaxResolveLoopCount = 20;
 
-    public void Resolve(BoardModel boardModel)
+    public Dictionary<ColorId, int> Resolve(BoardModel boardModel)
     {
+        Dictionary<ColorId, int> totalScores = new Dictionary<ColorId, int>();
+
         if (boardModel == null)
-            return;
+            return totalScores;
 
         int loopCount = 0;
         bool hasAnyMatch;
@@ -22,7 +24,8 @@ public class MatchResolver
             if (horizontalMatches.Count > 0)
             {
                 List<MatchedMiniCell> expandedHorizontalMatches = ExpandToConnectedColorGroups(horizontalMatches);
-                ApplyMatches(boardModel, expandedHorizontalMatches);
+                Dictionary<ColorId, int> horizontalScores = ApplyMatches(boardModel, expandedHorizontalMatches);
+                MergeScores(totalScores, horizontalScores);
                 hasAnyMatch = true;
             }
 
@@ -31,7 +34,8 @@ public class MatchResolver
             if (verticalMatches.Count > 0)
             {
                 List<MatchedMiniCell> expandedVerticalMatches = ExpandToConnectedColorGroups(verticalMatches);
-                ApplyMatches(boardModel, expandedVerticalMatches);
+                Dictionary<ColorId, int> verticalScores = ApplyMatches(boardModel, expandedVerticalMatches);
+                MergeScores(totalScores, verticalScores);
                 hasAnyMatch = true;
             }
 
@@ -44,6 +48,8 @@ public class MatchResolver
             }
 
         } while (hasAnyMatch);
+
+        return totalScores;
     }
 
     private List<MatchedMiniCell> FindHorizontalMatches(BoardModel boardModel)
@@ -223,8 +229,9 @@ public class MatchResolver
         }
     }
 
-    private void ApplyMatches(BoardModel boardModel, List<MatchedMiniCell> matches)
+    private Dictionary<ColorId, int> ApplyMatches(BoardModel boardModel, List<MatchedMiniCell> matches)
     {
+        Dictionary<ColorId, int> scoreByColor = CalculateScoreByColor(matches);
         HashSet<PieceView> affectedPieces = new HashSet<PieceView>();
 
         foreach (MatchedMiniCell match in matches)
@@ -248,6 +255,48 @@ public class MatchResolver
         }
 
         Debug.Log($"Resolved {matches.Count} mini cells after connected-group expansion.");
+
+        return scoreByColor;
+    }
+
+    private Dictionary<ColorId, int> CalculateScoreByColor(List<MatchedMiniCell> matches)
+    {
+        Dictionary<ColorId, HashSet<PieceView>> piecesByColor = new Dictionary<ColorId, HashSet<PieceView>>();
+
+        foreach (MatchedMiniCell match in matches)
+        {
+            if (match.Color == ColorId.None)
+                continue;
+
+            if (!piecesByColor.ContainsKey(match.Color))
+            {
+                piecesByColor[match.Color] = new HashSet<PieceView>();
+            }
+
+            piecesByColor[match.Color].Add(match.Piece);
+        }
+
+        Dictionary<ColorId, int> scoreByColor = new Dictionary<ColorId, int>();
+
+        foreach (KeyValuePair<ColorId, HashSet<PieceView>> pair in piecesByColor)
+        {
+            scoreByColor[pair.Key] = pair.Value.Count;
+        }
+
+        return scoreByColor;
+    }
+
+    private void MergeScores(Dictionary<ColorId, int> totalScores, Dictionary<ColorId, int> addedScores)
+    {
+        foreach (KeyValuePair<ColorId, int> pair in addedScores)
+        {
+            if (!totalScores.ContainsKey(pair.Key))
+            {
+                totalScores[pair.Key] = 0;
+            }
+
+            totalScores[pair.Key] += pair.Value;
+        }
     }
 
     private List<MatchedMiniCell> RemoveDuplicateMatches(List<MatchedMiniCell> matches)

@@ -13,6 +13,11 @@ public class PieceSpawner : MonoBehaviour
 
     public void SpawnNextPiece()
     {
+        if (LevelManager.Instance != null && LevelManager.Instance.IsLevelEnded)
+        {
+            return;
+        }
+
         if (boardManager == null)
         {
             Debug.LogError("BoardManager is missing.");

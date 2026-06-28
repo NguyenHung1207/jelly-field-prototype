@@ -44,7 +44,11 @@ public class PieceDragController : MonoBehaviour
         if (placedSuccessfully)
         {
             isPlaced = true;
-            pieceSpawner.SpawnNextPiece();
+
+            if (LevelManager.Instance == null || !LevelManager.Instance.IsLevelEnded)
+            {
+                pieceSpawner.SpawnNextPiece();
+            }
         }
         else
         {
