@@ -6,13 +6,23 @@ public class BoardManager : MonoBehaviour
     public static BoardManager Instance { get; private set; }
 
     [Header("Board Settings")]
-    [SerializeField] private int width = 4;
+    [SerializeField] private int width = 5;
     [SerializeField] private int height = 5;
     [SerializeField] private float cellSize = 1.1f;
+
+    [Header("Board Shape")]
+    [SerializeField] private Vector2Int[] blockedCells =
+    {
+        new Vector2Int(0, 0),
+        new Vector2Int(4, 0),
+        new Vector2Int(0, 4),
+        new Vector2Int(4, 4)
+    };
 
     private BoardModel boardModel;
     private MatchResolver matchResolver;
     private Transform boardRoot;
+    private bool[,] validCells;
 
     public float DragPlaneY => 0.35f;
 
@@ -25,7 +35,9 @@ public class BoardManager : MonoBehaviour
         }
 
         Instance = this;
-        boardModel = new BoardModel(width, height);
+
+        validCells = CreateValidCellMask();
+        boardModel = new BoardModel(width, height, validCells);
         matchResolver = new MatchResolver();
     }
 
@@ -33,6 +45,32 @@ public class BoardManager : MonoBehaviour
     {
         SetupCamera();
         CreateBoard();
+    }
+
+    private bool[,] CreateValidCellMask()
+    {
+        bool[,] mask = new bool[width, height];
+
+        for (int x = 0; x < width; x++)
+        {
+            for (int z = 0; z < height; z++)
+            {
+                mask[x, z] = true;
+            }
+        }
+
+        foreach (Vector2Int blockedCell in blockedCells)
+        {
+            if (blockedCell.x < 0 || blockedCell.x >= width)
+                continue;
+
+            if (blockedCell.y < 0 || blockedCell.y >= height)
+                continue;
+
+            mask[blockedCell.x, blockedCell.y] = false;
+        }
+
+        return mask;
     }
 
     private void CreateBoard()
@@ -45,6 +83,9 @@ public class BoardManager : MonoBehaviour
         {
             for (int z = 0; z < height; z++)
             {
+                if (!validCells[x, z])
+                    continue;
+
                 GameObject cell = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 cell.name = $"Cell_{x}_{z}";
 
@@ -67,7 +108,10 @@ public class BoardManager : MonoBehaviour
             return false;
 
         if (!boardModel.CanPlace(x, z))
+        {
+            Debug.LogWarning($"Cannot place at ({x}, {z}). Cell is invalid or occupied.");
             return false;
+        }
 
         boardModel.PlacePiece(x, z, pieceView);
 
@@ -111,7 +155,7 @@ public class BoardManager : MonoBehaviour
         x = Mathf.RoundToInt(worldPosition.x / cellSize);
         z = Mathf.RoundToInt(worldPosition.z / cellSize);
 
-        return boardModel.IsInside(x, z);
+        return boardModel.IsValidCell(x, z);
     }
 
     public Vector3 GetCellWorldPosition(int x, int z)
