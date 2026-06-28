@@ -18,6 +18,7 @@ public class PieceView : MonoBehaviour
         CreateMiniCube(MiniSlot.BottomLeft, new Vector3(-0.25f, 0f, -0.25f));
         CreateMiniCube(MiniSlot.BottomRight, new Vector3(0.25f, 0f, -0.25f));
 
+        EnsureRootCollider();
         Refresh();
     }
 
@@ -46,8 +47,27 @@ public class PieceView : MonoBehaviour
         cube.transform.localPosition = localPosition;
         cube.transform.localScale = new Vector3(0.48f, 0.25f, 0.48f);
 
+        Collider childCollider = cube.GetComponent<Collider>();
+        if (childCollider != null)
+        {
+            Destroy(childCollider);
+        }
+
         Renderer renderer = cube.GetComponent<Renderer>();
         miniCubeRenderers[slot] = renderer;
+    }
+
+    private void EnsureRootCollider()
+    {
+        BoxCollider boxCollider = GetComponent<BoxCollider>();
+
+        if (boxCollider == null)
+        {
+            boxCollider = gameObject.AddComponent<BoxCollider>();
+        }
+
+        boxCollider.center = Vector3.zero;
+        boxCollider.size = new Vector3(1f, 0.5f, 1f);
     }
 
     private void ClearChildren()

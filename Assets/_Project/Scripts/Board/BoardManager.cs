@@ -2,37 +2,41 @@ using UnityEngine;
 
 public class BoardManager : MonoBehaviour
 {
+    public static BoardManager Instance { get; private set; }
+
     [Header("Board Settings")]
     [SerializeField] private int width = 4;
     [SerializeField] private int height = 5;
     [SerializeField] private float cellSize = 1.1f;
 
-    private PieceView testPiece;
+    private BoardModel boardModel;
+    private Transform boardRoot;
+
+    public float DragPlaneY => 0.35f;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+        boardModel = new BoardModel(width, height);
+    }
 
     private void Start()
     {
         SetupCamera();
         CreateBoard();
-        CreateTestPieceA();
-    }
-
-    private void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.Alpha1))
-        {
-            TestCaseA();
-        }
-
-        if (Input.GetKeyDown(KeyCode.Alpha2))
-        {
-            TestCaseB();
-        }
     }
 
     private void CreateBoard()
     {
-        GameObject boardRoot = new GameObject("Generated Board");
-        boardRoot.transform.SetParent(transform, false);
+        GameObject boardRootObject = new GameObject("Generated Board");
+        boardRootObject.transform.SetParent(transform, false);
+        boardRoot = boardRootObject.transform;
 
         for (int x = 0; x < width; x++)
         {
@@ -41,8 +45,8 @@ public class BoardManager : MonoBehaviour
                 GameObject cell = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 cell.name = $"Cell_{x}_{z}";
 
-                cell.transform.SetParent(boardRoot.transform, false);
-                cell.transform.position = new Vector3(x * cellSize, -0.08f, z * cellSize);
+                cell.transform.SetParent(boardRoot, false);
+                cell.transform.position = GetCellWorldPosition(x, z);
                 cell.transform.localScale = new Vector3(0.95f, 0.08f, 0.95f);
 
                 Renderer renderer = cell.GetComponent<Renderer>();
@@ -51,68 +55,61 @@ public class BoardManager : MonoBehaviour
         }
     }
 
-    private void CreateTestPieceA()
+    public bool TryPlacePiece(PieceView pieceView)
     {
-        PieceData data = new PieceData(
-            ColorId.Yellow,
-            ColorId.Green,
-            ColorId.Red,
-            ColorId.Red
-        );
+        if (pieceView == null)
+            return false;
 
-        CreateOrReplaceTestPiece(data);
-    }
+        if (!TryGetGridPositionFromWorld(pieceView.transform.position, out int x, out int z))
+            return false;
 
-    private void CreateTestPieceB()
-    {
-        PieceData data = new PieceData(
-            ColorId.Yellow,
-            ColorId.Yellow,
-            ColorId.Red,
-            ColorId.Green
-        );
+        if (!boardModel.CanPlace(x, z))
+            return false;
 
-        CreateOrReplaceTestPiece(data);
-    }
+        boardModel.PlacePiece(x, z, pieceView);
 
-    private void CreateOrReplaceTestPiece(PieceData data)
-    {
-        if (testPiece != null)
+        Vector3 snapPosition = GetCellWorldPosition(x, z);
+        snapPosition.y = 0.25f;
+
+        pieceView.transform.position = snapPosition;
+        pieceView.transform.SetParent(boardRoot, true);
+
+        PieceDragController dragController = pieceView.GetComponent<PieceDragController>();
+        if (dragController != null)
         {
-            Destroy(testPiece.gameObject);
+            dragController.SetPlaced();
         }
 
-        GameObject pieceObject = new GameObject("Test Piece");
-        pieceObject.transform.position = new Vector3(
-            (width - 1) * cellSize * 0.5f,
-            0.25f,
-            (height - 1) * cellSize * 0.5f
-        );
+        Collider collider = pieceView.GetComponent<Collider>();
+        if (collider != null)
+        {
+            collider.enabled = false;
+        }
 
-        testPiece = pieceObject.AddComponent<PieceView>();
-        testPiece.Build(data);
+        Debug.Log($"Placed piece at ({x}, {z})");
+
+        return true;
     }
 
-    private void TestCaseA()
+    public bool TryGetGridPositionFromWorld(Vector3 worldPosition, out int x, out int z)
     {
-        CreateTestPieceA();
+        x = Mathf.RoundToInt(worldPosition.x / cellSize);
+        z = Mathf.RoundToInt(worldPosition.z / cellSize);
 
-        testPiece.Data.Clear(MiniSlot.TopLeft);
-        testPiece.Data.ResolveEmptySlots();
-        testPiece.Refresh();
-
-        Debug.Log("Test A: [Yellow, Green, Red, Red] -> clear Yellow -> [Green, Green, Red, Red]");
+        return boardModel.IsInside(x, z);
     }
 
-    private void TestCaseB()
+    public Vector3 GetCellWorldPosition(int x, int z)
     {
-        CreateTestPieceB();
+        return new Vector3(x * cellSize, -0.08f, z * cellSize);
+    }
 
-        testPiece.Data.Clear(MiniSlot.TopLeft, MiniSlot.TopRight);
-        testPiece.Data.ResolveEmptySlots();
-        testPiece.Refresh();
+    public Vector3 GetSpawnWorldPosition()
+    {
+        float centerX = (width - 1) * cellSize * 0.5f;
+        float spawnZ = -1.4f * cellSize;
 
-        Debug.Log("Test B: [Yellow, Yellow, Red, Green] -> clear Yellow row -> [Red, Green, Red, Green]");
+        return new Vector3(centerX, 0.25f, spawnZ);
     }
 
     private void SetupCamera()
@@ -129,7 +126,7 @@ public class BoardManager : MonoBehaviour
         );
 
         mainCamera.orthographic = true;
-        mainCamera.orthographicSize = Mathf.Max(width, height) * 0.85f;
+        mainCamera.orthographicSize = Mathf.Max(width, height + 2) * 0.75f;
         mainCamera.transform.position = boardCenter + new Vector3(0f, 6f, -6f);
         mainCamera.transform.rotation = Quaternion.Euler(60f, 0f, 0f);
     }
