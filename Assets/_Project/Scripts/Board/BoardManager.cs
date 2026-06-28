@@ -10,6 +10,7 @@ public class BoardManager : MonoBehaviour
     [SerializeField] private float cellSize = 1.1f;
 
     private BoardModel boardModel;
+    private MatchResolver matchResolver;
     private Transform boardRoot;
 
     public float DragPlaneY => 0.35f;
@@ -24,6 +25,7 @@ public class BoardManager : MonoBehaviour
 
         Instance = this;
         boardModel = new BoardModel(width, height);
+        matchResolver = new MatchResolver();
     }
 
     private void Start()
@@ -87,6 +89,8 @@ public class BoardManager : MonoBehaviour
         }
 
         Debug.Log($"Placed piece at ({x}, {z})");
+
+        matchResolver.Resolve(boardModel);
 
         return true;
     }

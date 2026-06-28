@@ -48,4 +48,24 @@ public class BoardModel
 
         return true;
     }
+
+    public bool RemovePiece(PieceView pieceView)
+    {
+        if (pieceView == null)
+            return false;
+
+        for (int x = 0; x < Width; x++)
+        {
+            for (int z = 0; z < Height; z++)
+            {
+                if (pieces[x, z] == pieceView)
+                {
+                    pieces[x, z] = null;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 }

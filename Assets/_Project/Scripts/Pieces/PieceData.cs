@@ -69,4 +69,15 @@ public class PieceData
         Colors[emptyIndex] = Colors[sourceIndex];
         return true;
     }
+
+    public bool IsEmpty()
+    {
+        for (int i = 0; i < Colors.Length; i++)
+        {
+            if (Colors[i] != ColorId.None)
+                return false;
+        }
+
+        return true;
+    }
 }
