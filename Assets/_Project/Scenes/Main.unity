@@ -163,9 +163,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d282688f83948cb4f892d8b878f0a739, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LevelManager
-  targetGoals:
-  - Color: 1
-    RequiredScore: 6
+  levelConfigs:
+  - {fileID: 11400000, guid: c766f66a1b93529429113eca5320f0f0, type: 2}
+  - {fileID: 11400000, guid: 2e78e1ef31e15fb47b082a551166bf35, type: 2}
+  - {fileID: 11400000, guid: 925e9bca4acd8a3499e9734fea9d34c6, type: 2}
 --- !u!1 &287836473
 GameObject:
   m_ObjectHideFlags: 0

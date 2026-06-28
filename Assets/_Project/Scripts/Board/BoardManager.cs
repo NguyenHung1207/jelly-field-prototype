@@ -5,19 +5,10 @@ public class BoardManager : MonoBehaviour
 {
     public static BoardManager Instance { get; private set; }
 
-    [Header("Board Settings")]
+    [Header("Fallback Board Settings")]
     [SerializeField] private int width = 5;
     [SerializeField] private int height = 5;
     [SerializeField] private float cellSize = 1.1f;
-
-    [Header("Board Shape")]
-    [SerializeField] private Vector2Int[] blockedCells =
-    {
-        new Vector2Int(0, 0),
-        new Vector2Int(4, 0),
-        new Vector2Int(0, 4),
-        new Vector2Int(4, 4)
-    };
 
     private BoardModel boardModel;
     private MatchResolver matchResolver;
@@ -35,16 +26,36 @@ public class BoardManager : MonoBehaviour
         }
 
         Instance = this;
-
-        validCells = CreateValidCellMask();
-        boardModel = new BoardModel(width, height, validCells);
         matchResolver = new MatchResolver();
     }
 
     private void Start()
     {
+        ApplyLevelConfig();
+        validCells = CreateValidCellMask();
+        boardModel = new BoardModel(width, height, validCells);
+
         SetupCamera();
         CreateBoard();
+
+        PieceSpawner spawner = FindFirstObjectByType<PieceSpawner>();
+        if (spawner != null)
+        {
+            spawner.Initialize(this);
+        }
+    }
+
+    private void ApplyLevelConfig()
+    {
+        if (LevelManager.Instance == null || LevelManager.Instance.CurrentConfig == null)
+        {
+            Debug.LogWarning("BoardManager is using fallback board settings because LevelConfig is missing.");
+            return;
+        }
+
+        LevelConfig config = LevelManager.Instance.CurrentConfig;
+        width = config.Width;
+        height = config.Height;
     }
 
     private bool[,] CreateValidCellMask()
@@ -58,6 +69,13 @@ public class BoardManager : MonoBehaviour
                 mask[x, z] = true;
             }
         }
+
+        if (LevelManager.Instance == null || LevelManager.Instance.CurrentConfig == null)
+        {
+            return mask;
+        }
+
+        Vector2Int[] blockedCells = LevelManager.Instance.CurrentConfig.BlockedCells;
 
         foreach (Vector2Int blockedCell in blockedCells)
         {

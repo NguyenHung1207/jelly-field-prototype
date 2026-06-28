@@ -196,13 +196,17 @@ public class UIManager : MonoBehaviour
             builder.Append("   ");
         }
 
-        targetText.text = builder.ToString();
+        string levelName = LevelManager.Instance.CurrentConfig != null
+    ? LevelManager.Instance.CurrentConfig.LevelName
+    : $"Level {LevelManager.Instance.CurrentLevelNumber}";
+
+        targetText.text = $"{levelName}\n{builder}";
     }
 
     private void ShowLevelComplete()
     {
         resultTitleText.text = "LEVEL COMPLETE!";
-        nextLevelButton.gameObject.SetActive(true);
+        nextLevelButton.gameObject.SetActive(LevelManager.Instance != null && LevelManager.Instance.HasNextLevel);
         resultPanel.SetActive(true);
     }
 
@@ -220,13 +224,17 @@ public class UIManager : MonoBehaviour
 
     private void RetryLevel()
     {
-        Scene currentScene = SceneManager.GetActiveScene();
-        SceneManager.LoadScene(currentScene.buildIndex);
+        if (LevelManager.Instance != null)
+        {
+            LevelManager.Instance.RetryLevel();
+        }
     }
 
     private void GoToNextLevelPlaceholder()
     {
-        Debug.Log("Next Level button clicked. Multi-level flow will be added in the next step.");
-        RetryLevel();
+        if (LevelManager.Instance != null)
+        {
+            LevelManager.Instance.GoToNextLevel();
+        }
     }
 }

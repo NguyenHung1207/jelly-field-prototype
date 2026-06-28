@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class LevelManager : MonoBehaviour
 {
@@ -10,16 +11,21 @@ public class LevelManager : MonoBehaviour
     public event Action OnLevelCompleted;
     public event Action OnLevelFailed;
 
-    [Header("Level Target")]
-    [SerializeField] private TargetGoal[] targetGoals =
-    {
-        new TargetGoal { Color = ColorId.Yellow, RequiredScore = 6 }
-    };
+    [Header("Level Configs")]
+    [SerializeField] private LevelConfig[] levelConfigs;
 
     private readonly Dictionary<ColorId, int> requiredScores = new Dictionary<ColorId, int>();
     private readonly Dictionary<ColorId, int> currentScores = new Dictionary<ColorId, int>();
 
+    public LevelConfig CurrentConfig { get; private set; }
     public bool IsLevelEnded { get; private set; }
+
+    public int CurrentLevelIndex => LevelProgress.CurrentLevelIndex;
+    public int CurrentLevelNumber => CurrentLevelIndex + 1;
+
+    public bool HasNextLevel =>
+        levelConfigs != null &&
+        LevelProgress.CurrentLevelIndex < levelConfigs.Length - 1;
 
     private void Awake()
     {
@@ -30,6 +36,7 @@ public class LevelManager : MonoBehaviour
         }
 
         Instance = this;
+        LoadCurrentConfig();
         InitializeTargets();
     }
 
@@ -38,13 +45,42 @@ public class LevelManager : MonoBehaviour
         OnScoreChanged?.Invoke();
     }
 
+    private void LoadCurrentConfig()
+    {
+        if (levelConfigs == null || levelConfigs.Length == 0)
+        {
+            Debug.LogError("No LevelConfig assigned to LevelManager.");
+            return;
+        }
+
+        if (LevelProgress.CurrentLevelIndex < 0)
+        {
+            LevelProgress.CurrentLevelIndex = 0;
+        }
+
+        if (LevelProgress.CurrentLevelIndex >= levelConfigs.Length)
+        {
+            LevelProgress.CurrentLevelIndex = levelConfigs.Length - 1;
+        }
+
+        CurrentConfig = levelConfigs[LevelProgress.CurrentLevelIndex];
+
+        if (CurrentConfig == null)
+        {
+            Debug.LogError($"LevelConfig at index {LevelProgress.CurrentLevelIndex} is null.");
+        }
+    }
+
     private void InitializeTargets()
     {
         requiredScores.Clear();
         currentScores.Clear();
         IsLevelEnded = false;
 
-        foreach (TargetGoal goal in targetGoals)
+        if (CurrentConfig == null)
+            return;
+
+        foreach (TargetGoal goal in CurrentConfig.TargetGoals)
         {
             if (goal == null)
                 continue;
@@ -59,7 +95,7 @@ public class LevelManager : MonoBehaviour
             currentScores[goal.Color] = 0;
         }
 
-        Debug.Log("Level started.");
+        Debug.Log($"Level started: {CurrentConfig.LevelName}");
         LogTargetProgress();
     }
 
@@ -98,11 +134,6 @@ public class LevelManager : MonoBehaviour
         }
     }
 
-    public bool HasTarget(ColorId color)
-    {
-        return requiredScores.ContainsKey(color);
-    }
-
     public IReadOnlyDictionary<ColorId, int> GetRequiredScores()
     {
         return requiredScores;
@@ -121,6 +152,26 @@ public class LevelManager : MonoBehaviour
         IsLevelEnded = true;
         Debug.Log("LEVEL FAILED: Board is full and targets are not completed.");
         OnLevelFailed?.Invoke();
+    }
+
+    public void RetryLevel()
+    {
+        Scene currentScene = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(currentScene.buildIndex);
+    }
+
+    public void GoToNextLevel()
+    {
+        if (!HasNextLevel)
+        {
+            Debug.Log("No next level. Restarting current level.");
+            RetryLevel();
+            return;
+        }
+
+        LevelProgress.CurrentLevelIndex++;
+        Scene currentScene = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(currentScene.buildIndex);
     }
 
     private bool IsWinConditionMet()

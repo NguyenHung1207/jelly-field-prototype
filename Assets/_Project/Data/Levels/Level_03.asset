@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31dfd662ca23aca478e04906deeb8cad, type: 3}
+  m_Name: Level_03
+  m_EditorClassIdentifier: Assembly-CSharp::LevelConfig
+  LevelName: Level 3
+  Width: 5
+  Height: 5
+  BlockedCells:
+  - {x: 0, y: 0}
+  - {x: 1, y: 0}
+  - {x: 3, y: 0}
+  - {x: 4, y: 0}
+  - {x: 0, y: 4}
+  - {x: 3, y: 4}
+  - {x: 4, y: 4}
+  TargetGoals:
+  - Color: 2
+    RequiredScore: 4
+  - Color: 6
+    RequiredScore: 4
+  - Color: 4
+    RequiredScore: 4
+  PieceSequence:
+  - TopLeft: 2
+    TopRight: 6
+    BottomLeft: 4
+    BottomRight: 3
+  - TopLeft: 6
+    TopRight: 2
+    BottomLeft: 1
+    BottomRight: 4
+  - TopLeft: 4
+    TopRight: 4
+    BottomLeft: 2
+    BottomRight: 6
+  - TopLeft: 5
+    TopRight: 2
+    BottomLeft: 6
+    BottomRight: 1
+  - TopLeft: 3
+    TopRight: 6
+    BottomLeft: 4
+    BottomRight: 2
+  - TopLeft: 2
+    TopRight: 1
+    BottomLeft: 4
+    BottomRight: 6
