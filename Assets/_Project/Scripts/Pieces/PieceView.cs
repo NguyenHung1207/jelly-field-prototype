@@ -270,27 +270,19 @@ public class PieceView : MonoBehaviour
             worldBounds.Encapsulate(renderers[i].bounds);
         }
 
-        Vector3 localCenter = slotRoot.InverseTransformPoint(worldBounds.center);
-
         Vector3 localSize = new Vector3(
             worldBounds.size.x / Mathf.Abs(slotRoot.lossyScale.x),
             worldBounds.size.y / Mathf.Abs(slotRoot.lossyScale.y),
             worldBounds.size.z / Mathf.Abs(slotRoot.lossyScale.z)
         );
 
-        float targetWidth = PieceLayout.MiniWidth;
-        float targetHeight = PieceLayout.MiniHeight;
-        float targetDepth = PieceLayout.MiniDepth;
+        float scaleX = PieceLayout.MiniWidth / Mathf.Max(localSize.x, 0.0001f);
+        float scaleZ = PieceLayout.MiniDepth / Mathf.Max(localSize.z, 0.0001f);
 
-        float scaleX = targetWidth / Mathf.Max(localSize.x, 0.0001f);
-        float scaleY = targetHeight / Mathf.Max(localSize.y, 0.0001f);
-        float scaleZ = targetDepth / Mathf.Max(localSize.z, 0.0001f);
+        float footprintScale = Mathf.Min(scaleX, scaleZ);
 
-        float uniformScale = Mathf.Min(scaleX, scaleY, scaleZ);
+        visualRoot.localScale *= footprintScale;
 
-        visualRoot.localScale *= uniformScale;
-
-        // Recalculate bounds after scaling.
         worldBounds = renderers[0].bounds;
 
         for (int i = 1; i < renderers.Length; i++)
@@ -298,10 +290,16 @@ public class PieceView : MonoBehaviour
             worldBounds.Encapsulate(renderers[i].bounds);
         }
 
-        localCenter = slotRoot.InverseTransformPoint(worldBounds.center);
+        Vector3 localCenter = slotRoot.InverseTransformPoint(worldBounds.center);
 
-        // Move visual mesh so its real rendered center is exactly at slotRoot origin.
         visualRoot.localPosition -= localCenter;
+
+        Vector3 currentScale = visualRoot.localScale;
+        visualRoot.localScale = new Vector3(
+            currentScale.x,
+            currentScale.y,
+            currentScale.z
+        );
     }
 
     private void CreateHighlight(MiniSlot slot)
@@ -327,8 +325,43 @@ public class PieceView : MonoBehaviour
         if (!miniCubeTransforms.TryGetValue(slot, out Transform t))
             return;
 
-        t.localPosition = PieceLayout.GetSlotLocalPosition(slot);
-        t.localScale = Vector3.one;
+        Vector3 basePosition = PieceLayout.GetSlotLocalPosition(slot);
+        Vector3 localPosition = basePosition;
+        Vector3 localScale = Vector3.one;
+
+        float overlap = PieceLayout.SameColorOverlap;
+
+        bool hasLeft = HasSameColor(GetLeftNeighbor(slot), colorId);
+        bool hasRight = HasSameColor(GetRightNeighbor(slot), colorId);
+        bool hasTop = HasSameColor(GetTopNeighbor(slot), colorId);
+        bool hasBottom = HasSameColor(GetBottomNeighbor(slot), colorId);
+
+        if (hasLeft)
+        {
+            localPosition.x -= overlap * 0.5f;
+            localScale.x += overlap / PieceLayout.MiniWidth;
+        }
+
+        if (hasRight)
+        {
+            localPosition.x += overlap * 0.5f;
+            localScale.x += overlap / PieceLayout.MiniWidth;
+        }
+
+        if (hasTop)
+        {
+            localPosition.z += overlap * 0.5f;
+            localScale.z += overlap / PieceLayout.MiniDepth;
+        }
+
+        if (hasBottom)
+        {
+            localPosition.z -= overlap * 0.5f;
+            localScale.z += overlap / PieceLayout.MiniDepth;
+        }
+
+        t.localPosition = localPosition;
+        t.localScale = localScale;
     }
 
     private void UpdateHighlightTransform(MiniSlot slot)
