@@ -522,7 +522,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BoardManager
   width: 4
   height: 5
-  cellSize: 1
+  cellSize: 0.96
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0

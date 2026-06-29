@@ -3,17 +3,18 @@ using UnityEngine;
 public static class PieceLayout
 {
     public const float MiniWidth = 0.44f;
-    public const float MiniHeight = 0.44f;
+    public const float MiniHeight = 0.34f;
     public const float MiniDepth = 0.44f;
 
-    public const float InnerGap = 0.015f;
+    // Khoảng hở giữa 2 màu khác nhau trong cùng 1 ô lớn
+    public const float InnerGap = 0.006f;
 
     public const float SlotOffset = (MiniWidth + InnerGap) * 0.5f;
 
-    public const float BoardCellFootprint = 0.96f;
+    public const float BoardCellFootprint = 0.94f;
     public const float BoardCellHeight = 0.10f;
 
-    public const float PlacedPieceY = 0.23f;
+    public const float PlacedPieceY = 0.21f;
 
     public static Vector3 GetSlotLocalPosition(MiniSlot slot)
     {

@@ -244,9 +244,9 @@ public class MatchResolver
 
         foreach (PieceView piece in affectedPieces)
         {
-            List<FillMove> fillMoves = piece.Data.ResolveEmptySlots();
             piece.Refresh();
-            piece.PlayFillAnimations(fillMoves);
+
+            List<FillMove> fillMoves = piece.Data.ResolveEmptySlots();
 
             if (piece.Data.IsEmpty())
             {
@@ -254,7 +254,11 @@ public class MatchResolver
                 Object.Destroy(piece.gameObject);
 
                 Debug.Log($"Removed empty piece: {piece.name}");
+                continue;
             }
+
+            piece.PlayFillAnimations(fillMoves);
+            piece.RefreshAfterDelay(0.45f);
         }
 
         Debug.Log($"Resolved {matches.Count} mini cells after connected-group expansion.");

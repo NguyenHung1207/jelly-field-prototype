@@ -76,20 +76,19 @@ public class PieceView : MonoBehaviour
         Vector3 toPosition = PieceLayout.GetSlotLocalPosition(move.To);
 
         bool horizontal = Mathf.Abs(fromPosition.x - toPosition.x) >
-                          Mathf.Abs(fromPosition.z - toPosition.z);
+                        Mathf.Abs(fromPosition.z - toPosition.z);
 
-        Vector3 startPosition = (fromPosition + toPosition) * 0.5f;
-        startPosition.y += 0.025f;
+        Vector3 finalCenter = (fromPosition + toPosition) * 0.5f;
+        finalCenter.y += 0.04f;
 
-        Vector3 endPosition = toPosition;
-        endPosition.y += 0.025f;
+        float distance;
 
-        Vector3 startSize;
+        Vector3 fullSize;
 
         if (horizontal)
         {
-            float distance = Mathf.Abs(fromPosition.x - toPosition.x);
-            startSize = new Vector3(
+            distance = Mathf.Abs(fromPosition.x - toPosition.x);
+            fullSize = new Vector3(
                 distance + PieceLayout.MiniWidth,
                 PieceLayout.MiniHeight,
                 PieceLayout.MiniDepth
@@ -97,63 +96,63 @@ public class PieceView : MonoBehaviour
         }
         else
         {
-            float distance = Mathf.Abs(fromPosition.z - toPosition.z);
-            startSize = new Vector3(
+            distance = Mathf.Abs(fromPosition.z - toPosition.z);
+            fullSize = new Vector3(
                 PieceLayout.MiniWidth,
                 PieceLayout.MiniHeight,
                 distance + PieceLayout.MiniDepth
             );
         }
 
-        Vector3 endSize = new Vector3(
-            PieceLayout.MiniWidth,
-            PieceLayout.MiniHeight,
-            PieceLayout.MiniDepth
-        );
-
         GameObject fillGhost = CreateVisualBlock(
-            $"FillGhost_{move.Color}_{move.From}_to_{move.To}",
-            startPosition,
-            startSize,
+            $"FillBar_{move.Color}_{move.From}_to_{move.To}",
+            finalCenter,
+            fullSize,
             move.Color
         );
 
-        Vector3 startScale = fillGhost.transform.localScale;
-        Vector3 endScale = new Vector3(
-            startScale.x * endSize.x / startSize.x,
-            startScale.y * endSize.y / startSize.y,
-            startScale.z * endSize.z / startSize.z
-        );
+        Vector3 fullScale = fillGhost.transform.localScale;
 
-        float duration = 0.22f;
+        float duration = 0.45f;
         float elapsed = 0f;
 
         while (elapsed < duration && fillGhost != null)
         {
             elapsed += Time.deltaTime;
-
             float t = Mathf.Clamp01(elapsed / duration);
-            float easedT = 1f - Mathf.Pow(1f - t, 3f);
 
-            fillGhost.transform.localPosition = Vector3.LerpUnclamped(
-                startPosition,
-                endPosition,
-                easedT
-            );
+            float easedT = t;
 
-            fillGhost.transform.localScale = Vector3.LerpUnclamped(
-                startScale,
-                endScale,
-                easedT
-            );
+            Vector3 scale = fullScale;
+
+            if (horizontal)
+            {
+                scale.x = Mathf.Lerp(0.05f, fullScale.x, easedT);
+
+                float direction = Mathf.Sign(toPosition.x - fromPosition.x);
+                float offset = (1f - easedT) * fullSize.x * 0.5f * direction;
+
+                fillGhost.transform.localPosition = finalCenter - new Vector3(offset, 0f, 0f);
+            }
+            else
+            {
+                scale.z = Mathf.Lerp(0.05f, fullScale.z, easedT);
+
+                float direction = Mathf.Sign(toPosition.z - fromPosition.z);
+                float offset = (1f - easedT) * fullSize.z * 0.5f * direction;
+
+                fillGhost.transform.localPosition = finalCenter - new Vector3(0f, 0f, offset);
+            }
+
+            fillGhost.transform.localScale = scale;
 
             yield return null;
         }
 
         if (fillGhost != null)
-    {
-        Destroy(fillGhost);
-    }
+        {
+            Destroy(fillGhost);
+        }
     }
 
     private List<VisualGroup> BuildVisualGroups()
@@ -380,9 +379,9 @@ public class PieceView : MonoBehaviour
         );
 
         Vector3 scaleMultiplier = new Vector3(
-            targetSize.x / Mathf.Max(localSize.x, 0.0001f),
-            targetSize.y / Mathf.Max(localSize.y, 0.0001f),
-            targetSize.z / Mathf.Max(localSize.z, 0.0001f)
+        targetSize.x / Mathf.Max(localSize.x, 0.0001f),
+        targetSize.y / Mathf.Max(localSize.y, 0.0001f),
+        targetSize.z / Mathf.Max(localSize.z, 0.0001f)
         );
 
         visualRoot.localScale = Vector3.Scale(visualRoot.localScale, scaleMultiplier);
@@ -424,6 +423,16 @@ public class PieceView : MonoBehaviour
         visualBlocks.Clear();
     }
 
+    public void RefreshAfterDelay(float delay)
+    {
+        StartCoroutine(RefreshAfterDelayRoutine(delay));
+    }
+
+    private IEnumerator RefreshAfterDelayRoutine(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        Refresh();
+    }
     private class VisualGroup
     {
         public readonly ColorId Color;
