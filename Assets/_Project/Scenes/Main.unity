@@ -796,6 +796,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ff1484d3c7b4ed645afad15799e09765, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PieceSpawner
+  miniBlockPrefab: {fileID: 4602549196029874712, guid: d9fd1e2054639eb4da7c81bcf8c02732, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

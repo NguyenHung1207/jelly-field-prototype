@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class PieceSpawner : MonoBehaviour
 {
+    [SerializeField] private GameObject miniBlockPrefab;
+
     private BoardManager boardManager;
     private int spawnIndex;
     private bool initialized;
@@ -33,7 +35,7 @@ public class PieceSpawner : MonoBehaviour
         pieceObject.transform.position = boardManager.GetSpawnWorldPosition();
 
         PieceView pieceView = pieceObject.AddComponent<PieceView>();
-        pieceView.Build(CreatePieceData(spawnIndex));
+        pieceView.Build(CreatePieceData(spawnIndex), miniBlockPrefab);
 
         JellyAnimator jellyAnimator = pieceObject.AddComponent<JellyAnimator>();
         jellyAnimator.PlaySpawnAnimation();

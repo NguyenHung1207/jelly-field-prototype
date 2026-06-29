@@ -10,9 +10,12 @@ public class PieceView : MonoBehaviour
 
     public PieceData Data { get; private set; }
 
-    public void Build(PieceData data)
+    private GameObject miniBlockPrefab;
+
+    public void Build(PieceData data, GameObject miniBlockPrefab = null)
     {
         Data = data;
+        this.miniBlockPrefab = miniBlockPrefab;
 
         ClearChildren();
 
@@ -208,23 +211,97 @@ public class PieceView : MonoBehaviour
 
     private void CreateMiniJellyBlock(MiniSlot slot)
     {
-        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        cube.name = slot.ToString();
+        GameObject slotRoot = new GameObject(slot.ToString());
+        slotRoot.transform.SetParent(transform, false);
 
-        cube.transform.SetParent(transform, false);
-        cube.transform.localPosition = PieceLayout.GetSlotLocalPosition(slot);
-        cube.transform.localScale = new Vector3(PieceLayout.MiniWidth, PieceLayout.MiniHeight, PieceLayout.MiniDepth);
+        slotRoot.transform.localPosition = PieceLayout.GetSlotLocalPosition(slot);
+        slotRoot.transform.localRotation = Quaternion.identity;
+        slotRoot.transform.localScale = Vector3.one;
 
-        Collider childCollider = cube.GetComponent<Collider>();
-        if (childCollider != null)
+        GameObject visualObject;
+
+        if (miniBlockPrefab != null)
         {
-            Destroy(childCollider);
+            visualObject = Instantiate(miniBlockPrefab, slotRoot.transform);
+            visualObject.name = "Visual";
+        }
+        else
+        {
+            visualObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            visualObject.name = "Visual";
+            visualObject.transform.SetParent(slotRoot.transform, false);
         }
 
-        miniCubeTransforms[slot] = cube.transform;
-        miniCubeRenderers[slot] = cube.GetComponent<Renderer>();
+        visualObject.transform.localPosition = Vector3.zero;
+        visualObject.transform.localRotation = Quaternion.identity;
+        visualObject.transform.localScale = Vector3.one;
 
-        CreateHighlight(slot);
+        Collider[] colliders = visualObject.GetComponentsInChildren<Collider>();
+        foreach (Collider collider in colliders)
+        {
+            Destroy(collider);
+        }
+
+        Renderer[] renderers = visualObject.GetComponentsInChildren<Renderer>();
+
+        if (renderers == null || renderers.Length == 0)
+        {
+            Debug.LogError($"Mini block prefab has no Renderer: {visualObject.name}");
+            return;
+        }
+
+        NormalizeVisualToSlot(slotRoot.transform, visualObject.transform, renderers);
+
+        miniCubeTransforms[slot] = slotRoot.transform;
+        miniCubeRenderers[slot] = renderers[0];
+
+        if (miniBlockPrefab == null)
+        {
+            CreateHighlight(slot);
+        }
+    }
+
+    private void NormalizeVisualToSlot(Transform slotRoot, Transform visualRoot, Renderer[] renderers)
+    {
+        Bounds worldBounds = renderers[0].bounds;
+
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            worldBounds.Encapsulate(renderers[i].bounds);
+        }
+
+        Vector3 localCenter = slotRoot.InverseTransformPoint(worldBounds.center);
+
+        Vector3 localSize = new Vector3(
+            worldBounds.size.x / Mathf.Abs(slotRoot.lossyScale.x),
+            worldBounds.size.y / Mathf.Abs(slotRoot.lossyScale.y),
+            worldBounds.size.z / Mathf.Abs(slotRoot.lossyScale.z)
+        );
+
+        float targetWidth = PieceLayout.MiniWidth;
+        float targetHeight = PieceLayout.MiniHeight;
+        float targetDepth = PieceLayout.MiniDepth;
+
+        float scaleX = targetWidth / Mathf.Max(localSize.x, 0.0001f);
+        float scaleY = targetHeight / Mathf.Max(localSize.y, 0.0001f);
+        float scaleZ = targetDepth / Mathf.Max(localSize.z, 0.0001f);
+
+        float uniformScale = Mathf.Min(scaleX, scaleY, scaleZ);
+
+        visualRoot.localScale *= uniformScale;
+
+        // Recalculate bounds after scaling.
+        worldBounds = renderers[0].bounds;
+
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            worldBounds.Encapsulate(renderers[i].bounds);
+        }
+
+        localCenter = slotRoot.InverseTransformPoint(worldBounds.center);
+
+        // Move visual mesh so its real rendered center is exactly at slotRoot origin.
+        visualRoot.localPosition -= localCenter;
     }
 
     private void CreateHighlight(MiniSlot slot)
@@ -247,23 +324,11 @@ public class PieceView : MonoBehaviour
 
     private void ApplyMergedLook(MiniSlot slot, ColorId colorId)
     {
-        Transform t = miniCubeTransforms[slot];
+        if (!miniCubeTransforms.TryGetValue(slot, out Transform t))
+            return;
 
-        float leftExtend = HasSameColor(GetLeftNeighbor(slot), colorId) ? PieceLayout.MergeOverlap : 0f;
-        float rightExtend = HasSameColor(GetRightNeighbor(slot), colorId) ? PieceLayout.MergeOverlap : 0f;
-        float upExtend = HasSameColor(GetTopNeighbor(slot), colorId) ? PieceLayout.MergeOverlap : 0f;
-        float downExtend = HasSameColor(GetBottomNeighbor(slot), colorId) ? PieceLayout.MergeOverlap : 0f;
-
-        Vector3 basePosition = PieceLayout.GetSlotLocalPosition(slot);
-
-        float width = PieceLayout.MiniWidth + leftExtend + rightExtend;
-        float depth = PieceLayout.MiniDepth + upExtend + downExtend;
-
-        float shiftX = (rightExtend - leftExtend) * 0.5f;
-        float shiftZ = (upExtend - downExtend) * 0.5f;
-
-        t.localPosition = basePosition + new Vector3(shiftX, 0f, shiftZ);
-        t.localScale = new Vector3(width, PieceLayout.MiniHeight, depth);
+        t.localPosition = PieceLayout.GetSlotLocalPosition(slot);
+        t.localScale = Vector3.one;
     }
 
     private void UpdateHighlightTransform(MiniSlot slot)
