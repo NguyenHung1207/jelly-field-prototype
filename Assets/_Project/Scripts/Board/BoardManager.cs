@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
-
+using System.Collections;
 public class BoardManager : MonoBehaviour
 {
     public static BoardManager Instance { get; private set; }
@@ -15,6 +15,8 @@ public class BoardManager : MonoBehaviour
     private Transform boardRoot;
     private bool[,] validCells;
 
+    private PieceSpawner pieceSpawner;
+    private bool isResolvingTurn;
     private readonly Dictionary<Vector2Int, Renderer> cellRenderers = new Dictionary<Vector2Int, Renderer>();
 
     private Material normalCellMaterial;
@@ -47,11 +49,12 @@ public class BoardManager : MonoBehaviour
         SetupCamera();
         CreateBoard();
 
-        PieceSpawner spawner = FindFirstObjectByType<PieceSpawner>();
-        if (spawner != null)
-        {
-            spawner.Initialize(this);
-        }
+    pieceSpawner = FindFirstObjectByType<PieceSpawner>();
+
+    if (pieceSpawner != null)
+    {
+        pieceSpawner.Initialize(this);
+    }
     }
 
     private void CreateRuntimeMaterials()
@@ -169,6 +172,9 @@ public class BoardManager : MonoBehaviour
 
     public bool TryPlacePiece(PieceView pieceView)
     {
+        if (isResolvingTurn)
+            return false;
+
         ClearPlacementPreview();
 
         if (pieceView == null)
@@ -207,6 +213,24 @@ public class BoardManager : MonoBehaviour
 
         Dictionary<ColorId, int> scoreByColor = matchResolver.Resolve(boardModel);
 
+        StartCoroutine(FinishTurnAfterAnimations(scoreByColor));
+
+        return true;
+    }
+
+    private IEnumerator FinishTurnAfterAnimations(Dictionary<ColorId, int> scoreByColor)
+    {
+        isResolvingTurn = true;
+
+        float delay = GameAnimationTiming.TurnResolveDelay;
+
+        if (scoreByColor == null || scoreByColor.Count == 0)
+        {
+            delay = GameAnimationTiming.PlaceAnimationDuration;
+        }
+
+        yield return new WaitForSeconds(delay);
+
         if (LevelManager.Instance != null)
         {
             LevelManager.Instance.AddScores(scoreByColor);
@@ -215,9 +239,21 @@ public class BoardManager : MonoBehaviour
             {
                 LevelManager.Instance.LoseLevel();
             }
+
+            if (!LevelManager.Instance.IsLevelEnded && pieceSpawner != null)
+            {
+                pieceSpawner.SpawnNextPiece();
+            }
+        }
+        else
+        {
+            if (pieceSpawner != null)
+            {
+                pieceSpawner.SpawnNextPiece();
+            }
         }
 
-        return true;
+        isResolvingTurn = false;
     }
 
     public void ShowPlacementPreview(Vector3 worldPosition)

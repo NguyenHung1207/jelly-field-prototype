@@ -258,7 +258,7 @@ public class MatchResolver
             }
 
             piece.PlayFillAnimations(fillMoves);
-            piece.RefreshAfterDelay(0.45f);
+            piece.RefreshAfterDelay(GameAnimationTiming.FillAnimationDuration);
         }
 
         Debug.Log($"Resolved {matches.Count} mini cells after connected-group expansion.");

@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class MatchDisappearEffect : MonoBehaviour
 {
-    [SerializeField] private float duration = 0.24f;
+    [SerializeField] private float duration = GameAnimationTiming.MatchDisappearDuration;
     [SerializeField] private float popScale = 1.25f;
     [SerializeField] private float liftHeight = 0.16f;
     [SerializeField] private float rotationAmount = 18f;

@@ -113,7 +113,7 @@ public class PieceView : MonoBehaviour
 
         Vector3 fullScale = fillGhost.transform.localScale;
 
-        float duration = 0.45f;
+        float duration = GameAnimationTiming.FillAnimationDuration;
         float elapsed = 0f;
 
         while (elapsed < duration && fillGhost != null)
