@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class PieceSpawner : MonoBehaviour
@@ -6,33 +7,68 @@ public class PieceSpawner : MonoBehaviour
 
     private BoardManager boardManager;
     private int spawnIndex;
+    private int activeSlotCount = 1;
     private bool initialized;
+
+    private readonly Dictionary<PieceView, int> slotByPiece = new Dictionary<PieceView, int>();
 
     public void Initialize(BoardManager boardManager)
     {
         this.boardManager = boardManager;
         initialized = true;
-        SpawnNextPiece();
+
+        LevelConfig config = LevelManager.Instance != null
+            ? LevelManager.Instance.CurrentConfig
+            : null;
+
+        activeSlotCount = config != null
+            ? Mathf.Clamp(config.SpawnSlotCount, 1, 2)
+            : 1;
+
+        SpawnInitialPieces();
     }
 
-    public void SpawnNextPiece()
+    private void SpawnInitialPieces()
+    {
+        slotByPiece.Clear();
+
+        for (int i = 0; i < activeSlotCount; i++)
+        {
+            SpawnPieceIntoSlot(i);
+        }
+    }
+
+    public void SpawnReplacementFor(PieceView placedPiece)
     {
         if (!initialized)
             return;
 
         if (LevelManager.Instance != null && LevelManager.Instance.IsLevelEnded)
+            return;
+
+        if (placedPiece == null)
+            return;
+
+        if (!slotByPiece.TryGetValue(placedPiece, out int slotIndex))
         {
+            Debug.LogWarning("Placed piece was not registered in any spawn slot.");
             return;
         }
 
+        slotByPiece.Remove(placedPiece);
+        SpawnPieceIntoSlot(slotIndex);
+    }
+
+    private void SpawnPieceIntoSlot(int slotIndex)
+    {
         if (boardManager == null)
         {
             Debug.LogError("BoardManager is missing.");
             return;
         }
 
-        GameObject pieceObject = new GameObject($"Piece_{spawnIndex}");
-        pieceObject.transform.position = boardManager.GetSpawnWorldPosition();
+        GameObject pieceObject = new GameObject($"Piece_{spawnIndex}_Slot_{slotIndex}");
+        pieceObject.transform.position = boardManager.GetSpawnWorldPosition(slotIndex, activeSlotCount);
 
         PieceView pieceView = pieceObject.AddComponent<PieceView>();
         pieceView.Build(CreatePieceData(spawnIndex), miniBlockPrefab);
@@ -43,6 +79,7 @@ public class PieceSpawner : MonoBehaviour
         PieceDragController dragController = pieceObject.AddComponent<PieceDragController>();
         dragController.Init(boardManager, this);
 
+        slotByPiece[pieceView] = slotIndex;
         spawnIndex++;
     }
 

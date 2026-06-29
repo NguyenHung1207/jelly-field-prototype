@@ -213,12 +213,12 @@ public class BoardManager : MonoBehaviour
 
         Dictionary<ColorId, int> scoreByColor = matchResolver.Resolve(boardModel);
 
-        StartCoroutine(FinishTurnAfterAnimations(scoreByColor));
+        StartCoroutine(FinishTurnAfterAnimations(scoreByColor, pieceView));
 
         return true;
     }
 
-    private IEnumerator FinishTurnAfterAnimations(Dictionary<ColorId, int> scoreByColor)
+    private IEnumerator FinishTurnAfterAnimations(Dictionary<ColorId, int> scoreByColor, PieceView placedPieceView)
     {
         isResolvingTurn = true;
 
@@ -242,14 +242,14 @@ public class BoardManager : MonoBehaviour
 
             if (!LevelManager.Instance.IsLevelEnded && pieceSpawner != null)
             {
-                pieceSpawner.SpawnNextPiece();
+                pieceSpawner.SpawnReplacementFor(placedPieceView);
             }
         }
         else
         {
             if (pieceSpawner != null)
             {
-                pieceSpawner.SpawnNextPiece();
+                pieceSpawner.SpawnReplacementFor(placedPieceView);
             }
         }
 
@@ -303,12 +303,19 @@ public class BoardManager : MonoBehaviour
         return new Vector3(x * cellSize, -0.08f, z * cellSize);
     }
 
-    public Vector3 GetSpawnWorldPosition()
+    public Vector3 GetSpawnWorldPosition(int slotIndex, int slotCount)
     {
         float centerX = (width - 1) * cellSize * 0.5f;
-        float spawnZ = -1.4f * cellSize;
+        float spawnZ = -1.45f * cellSize;
 
-        return new Vector3(centerX, PieceLayout.PlacedPieceY, spawnZ);
+        float slotSpacing = 0.90f;
+        float offsetX = (slotIndex - (slotCount - 1) * 0.5f) * slotSpacing;
+
+        return new Vector3(
+            centerX + offsetX,
+            PieceLayout.PlacedPieceY,
+            spawnZ
+        );
     }
 
     private void SetupCamera()

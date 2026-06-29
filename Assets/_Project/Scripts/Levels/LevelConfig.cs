@@ -14,6 +14,10 @@ public class LevelConfig : ScriptableObject
     [Header("Targets")]
     public TargetGoal[] TargetGoals;
 
+    [Header("Spawn")]
+    [Range(1, 2)]
+    public int SpawnSlotCount = 1;
+
     [Header("Piece Sequence")]
     public PiecePattern[] PieceSequence;
 }

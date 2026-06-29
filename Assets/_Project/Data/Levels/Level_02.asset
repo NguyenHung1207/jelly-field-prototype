@@ -25,6 +25,7 @@ MonoBehaviour:
     RequiredScore: 3
   - Color: 6
     RequiredScore: 3
+  SpawnSlotCount: 2
   PieceSequence:
   - TopLeft: 2
     TopRight: 6
