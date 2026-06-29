@@ -146,18 +146,23 @@ public class BoardManager : MonoBehaviour
                 if (!validCells[x, z])
                     continue;
 
-                GameObject cell = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                cell.name = $"Cell_{x}_{z}";
+                GameObject cell = new GameObject($"Cell_{x}_{z}");
 
                 cell.transform.SetParent(boardRoot, false);
                 cell.transform.position = GetCellWorldPosition(x, z);
-                cell.transform.localScale = new Vector3(0.95f, 0.08f, 0.95f);
 
-                Renderer renderer = cell.GetComponent<Renderer>();
-                renderer.sharedMaterial = normalCellMaterial;
+                MeshFilter meshFilter = cell.AddComponent<MeshFilter>();
+                meshFilter.sharedMesh = RoundedCellMeshFactory.CreateRoundedSquareMesh(
+                    PieceLayout.BoardCellFootprint,
+                    0.16f,
+                    8
+                );
+
+                MeshRenderer meshRenderer = cell.AddComponent<MeshRenderer>();
+                meshRenderer.sharedMaterial = normalCellMaterial;
 
                 Vector2Int coordinate = new Vector2Int(x, z);
-                cellRenderers[coordinate] = renderer;
+                cellRenderers[coordinate] = meshRenderer;
             }
         }
     }
@@ -181,7 +186,7 @@ public class BoardManager : MonoBehaviour
         boardModel.PlacePiece(x, z, pieceView);
 
         Vector3 snapPosition = GetCellWorldPosition(x, z);
-        snapPosition.y = 0.25f;
+        snapPosition.y = PieceLayout.PlacedPieceY;
 
         pieceView.transform.position = snapPosition;
         pieceView.transform.SetParent(boardRoot, true);
@@ -267,7 +272,7 @@ public class BoardManager : MonoBehaviour
         float centerX = (width - 1) * cellSize * 0.5f;
         float spawnZ = -1.4f * cellSize;
 
-        return new Vector3(centerX, 0.25f, spawnZ);
+        return new Vector3(centerX, PieceLayout.PlacedPieceY, spawnZ);
     }
 
     private void SetupCamera()

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 [Serializable]
 public class PieceData
@@ -31,31 +32,35 @@ public class PieceData
         }
     }
 
-    public void ResolveEmptySlots()
+    public List<FillMove> ResolveEmptySlots()
     {
-        ResolveHorizontalFirst();
-        ResolveVerticalSecond();
+        List<FillMove> fillMoves = new List<FillMove>();
+
+        ResolveHorizontalFirst(fillMoves);
+        ResolveVerticalSecond(fillMoves);
+
+        return fillMoves;
     }
 
-    private void ResolveHorizontalFirst()
+    private void ResolveHorizontalFirst(List<FillMove> fillMoves)
     {
-        CopyIfEmpty(MiniSlot.TopLeft, MiniSlot.TopRight);
-        CopyIfEmpty(MiniSlot.TopRight, MiniSlot.TopLeft);
+        CopyIfEmpty(MiniSlot.TopLeft, MiniSlot.TopRight, fillMoves);
+        CopyIfEmpty(MiniSlot.TopRight, MiniSlot.TopLeft, fillMoves);
 
-        CopyIfEmpty(MiniSlot.BottomLeft, MiniSlot.BottomRight);
-        CopyIfEmpty(MiniSlot.BottomRight, MiniSlot.BottomLeft);
+        CopyIfEmpty(MiniSlot.BottomLeft, MiniSlot.BottomRight, fillMoves);
+        CopyIfEmpty(MiniSlot.BottomRight, MiniSlot.BottomLeft, fillMoves);
     }
 
-    private void ResolveVerticalSecond()
+    private void ResolveVerticalSecond(List<FillMove> fillMoves)
     {
-        CopyIfEmpty(MiniSlot.TopLeft, MiniSlot.BottomLeft);
-        CopyIfEmpty(MiniSlot.TopRight, MiniSlot.BottomRight);
+        CopyIfEmpty(MiniSlot.TopLeft, MiniSlot.BottomLeft, fillMoves);
+        CopyIfEmpty(MiniSlot.TopRight, MiniSlot.BottomRight, fillMoves);
 
-        CopyIfEmpty(MiniSlot.BottomLeft, MiniSlot.TopLeft);
-        CopyIfEmpty(MiniSlot.BottomRight, MiniSlot.TopRight);
+        CopyIfEmpty(MiniSlot.BottomLeft, MiniSlot.TopLeft, fillMoves);
+        CopyIfEmpty(MiniSlot.BottomRight, MiniSlot.TopRight, fillMoves);
     }
 
-    private bool CopyIfEmpty(MiniSlot emptySlot, MiniSlot sourceSlot)
+    private bool CopyIfEmpty(MiniSlot emptySlot, MiniSlot sourceSlot, List<FillMove> fillMoves)
     {
         int emptyIndex = (int)emptySlot;
         int sourceIndex = (int)sourceSlot;
@@ -67,6 +72,8 @@ public class PieceData
             return false;
 
         Colors[emptyIndex] = Colors[sourceIndex];
+        fillMoves.Add(new FillMove(sourceSlot, emptySlot, Colors[sourceIndex]));
+
         return true;
     }
 

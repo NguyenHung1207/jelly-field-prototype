@@ -244,8 +244,9 @@ public class MatchResolver
 
         foreach (PieceView piece in affectedPieces)
         {
-            piece.Data.ResolveEmptySlots();
+            List<FillMove> fillMoves = piece.Data.ResolveEmptySlots();
             piece.Refresh();
+            piece.PlayFillAnimations(fillMoves);
 
             if (piece.Data.IsEmpty())
             {
