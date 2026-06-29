@@ -236,14 +236,19 @@ public class MatchResolver
 
         foreach (MatchedMiniCell match in matches)
         {
-            match.Piece.PlayMatchDisappearEffect(match.Slot, match.Color);
+            if (match.Piece == null)
+                continue;
 
+            match.Piece.PlayMatchDisappearEffect(match.Slot, match.Color);
             match.Piece.Data.Set(match.Slot, ColorId.None);
             affectedPieces.Add(match.Piece);
         }
 
         foreach (PieceView piece in affectedPieces)
         {
+            if (piece == null)
+                continue;
+
             piece.Refresh();
 
             List<FillMove> fillMoves = piece.Data.ResolveEmptySlots();
@@ -251,17 +256,25 @@ public class MatchResolver
             if (piece.Data.IsEmpty())
             {
                 boardModel.RemovePiece(piece);
-                Object.Destroy(piece.gameObject);
+                piece.DestroyAfterDelay(GameAnimationTiming.MatchDisappearDuration);
 
-                Debug.Log($"Removed empty piece: {piece.name}");
+                Debug.Log($"Scheduled empty piece removal: {piece.name}");
                 continue;
             }
 
-            piece.PlayFillAnimations(fillMoves);
-            piece.RefreshAfterDelay(GameAnimationTiming.FillAnimationDuration);
+            piece.PlayFillAnimationsAfterDelay(
+                fillMoves,
+                GameAnimationTiming.MatchDisappearDuration
+            );
+
+            float finalRefreshDelay =
+                GameAnimationTiming.MatchDisappearDuration +
+                GameAnimationTiming.FillAnimationDuration;
+
+            piece.RefreshAfterDelay(finalRefreshDelay);
         }
 
-        Debug.Log($"Resolved {matches.Count} mini cells after connected-group expansion.");
+        Debug.Log($"Resolved {matches.Count} mini cells with delayed disappear/fill sequence.");
 
         return scoreByColor;
     }

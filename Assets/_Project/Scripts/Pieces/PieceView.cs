@@ -155,6 +155,50 @@ public class PieceView : MonoBehaviour
         }
     }
 
+    public void PlayFillAnimationsAfterDelay(List<FillMove> fillMoves, float delay)
+    {
+        StartCoroutine(PlayFillAnimationsAfterDelayRoutine(fillMoves, delay));
+    }
+
+    private IEnumerator PlayFillAnimationsAfterDelayRoutine(List<FillMove> fillMoves, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+
+        if (this == null || gameObject == null)
+            yield break;
+
+        PlayFillAnimations(fillMoves);
+    }
+
+    public void DestroyAfterDelay(float delay)
+    {
+        StartCoroutine(DestroyAfterDelayRoutine(delay));
+    }
+
+    private IEnumerator DestroyAfterDelayRoutine(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+
+        if (this != null && gameObject != null)
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    public void RefreshAfterDelay(float delay)
+    {
+        StartCoroutine(RefreshAfterDelayRoutine(delay));
+    }
+
+    private IEnumerator RefreshAfterDelayRoutine(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+
+        if (this == null || gameObject == null)
+            yield break;
+
+        Refresh();
+    }
     private List<VisualGroup> BuildVisualGroups()
     {
         List<VisualGroup> groups = new List<VisualGroup>();
@@ -421,17 +465,6 @@ public class PieceView : MonoBehaviour
         }
 
         visualBlocks.Clear();
-    }
-
-    public void RefreshAfterDelay(float delay)
-    {
-        StartCoroutine(RefreshAfterDelayRoutine(delay));
-    }
-
-    private IEnumerator RefreshAfterDelayRoutine(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        Refresh();
     }
     private class VisualGroup
     {
