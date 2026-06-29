@@ -2,13 +2,13 @@ using UnityEngine;
 
 public static class PieceLayout
 {
-    public const float SlotOffset = 0.225f;
-
-    public const float MiniWidth = 0.445f;
+    public const float MiniWidth = 0.44f;
     public const float MiniHeight = 0.44f;
-    public const float MiniDepth = 0.445f;
+    public const float MiniDepth = 0.44f;
 
-    public const float SameColorOverlap = 0.055f;
+    public const float InnerGap = 0.015f;
+
+    public const float SlotOffset = (MiniWidth + InnerGap) * 0.5f;
 
     public const float BoardCellFootprint = 0.96f;
     public const float BoardCellHeight = 0.10f;
