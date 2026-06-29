@@ -53,6 +53,8 @@ public class PieceView : MonoBehaviour
             color
         );
 
+        ghost.transform.SetParent(null, true);
+
         MatchDisappearEffect effect = ghost.AddComponent<MatchDisappearEffect>();
         effect.Play();
     }
@@ -126,7 +128,7 @@ public class PieceView : MonoBehaviour
         float duration = 0.22f;
         float elapsed = 0f;
 
-        while (elapsed < duration)
+        while (elapsed < duration && fillGhost != null)
         {
             elapsed += Time.deltaTime;
 
@@ -148,7 +150,10 @@ public class PieceView : MonoBehaviour
             yield return null;
         }
 
+        if (fillGhost != null)
+    {
         Destroy(fillGhost);
+    }
     }
 
     private List<VisualGroup> BuildVisualGroups()
@@ -417,11 +422,6 @@ public class PieceView : MonoBehaviour
         }
 
         visualBlocks.Clear();
-
-        for (int i = transform.childCount - 1; i >= 0; i--)
-        {
-            Destroy(transform.GetChild(i).gameObject);
-        }
     }
 
     private class VisualGroup
