@@ -344,8 +344,10 @@ public class BoardManager : MonoBehaviour
         );
 
         mainCamera.orthographic = true;
-        mainCamera.orthographicSize = Mathf.Max(width, height + 2) * 0.75f;
-        mainCamera.transform.position = boardCenter + new Vector3(0f, 6f, -6f);
+        mainCamera.orthographicSize = Mathf.Max(width, height + 3.8f) * 0.72f;
         mainCamera.transform.rotation = Quaternion.Euler(60f, 0f, 0f);
+        mainCamera.transform.position = boardCenter + new Vector3(0f, 6f, -6.8f);
+
+        mainCamera.transform.position += mainCamera.transform.up * 0.85f;
     }
 }
