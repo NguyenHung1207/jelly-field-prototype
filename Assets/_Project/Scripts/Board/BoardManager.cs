@@ -1,6 +1,7 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using System.Collections;
+
 public class BoardManager : MonoBehaviour
 {
     public static BoardManager Instance { get; private set; }
@@ -8,7 +9,7 @@ public class BoardManager : MonoBehaviour
     [Header("Fallback Board Settings")]
     [SerializeField] private int width = 5;
     [SerializeField] private int height = 5;
-    [SerializeField] private float cellSize = 1.1f;
+    [SerializeField] private float cellSize = 1.0f;
 
     private BoardModel boardModel;
     private MatchResolver matchResolver;
@@ -49,12 +50,12 @@ public class BoardManager : MonoBehaviour
         SetupCamera();
         CreateBoard();
 
-    pieceSpawner = FindFirstObjectByType<PieceSpawner>();
+        pieceSpawner = FindFirstObjectByType<PieceSpawner>();
 
-    if (pieceSpawner != null)
-    {
-        pieceSpawner.Initialize(this);
-    }
+        if (pieceSpawner != null)
+        {
+            pieceSpawner.Initialize(this);
+        }
     }
 
     private void CreateRuntimeMaterials()
@@ -211,25 +212,31 @@ public class BoardManager : MonoBehaviour
 
         Debug.Log($"Placed piece at ({x}, {z})");
 
-        Dictionary<ColorId, int> scoreByColor = matchResolver.Resolve(boardModel);
-
-        StartCoroutine(FinishTurnAfterAnimations(scoreByColor, pieceView));
+        StartCoroutine(FinishTurnSequence(pieceView));
 
         return true;
     }
 
-    private IEnumerator FinishTurnAfterAnimations(Dictionary<ColorId, int> scoreByColor, PieceView placedPieceView)
+    private IEnumerator FinishTurnSequence(PieceView placedPieceView)
     {
         isResolvingTurn = true;
 
-        float delay = GameAnimationTiming.TurnResolveDelay;
+        Dictionary<ColorId, int> scoreByColor = null;
 
-        if (scoreByColor == null || scoreByColor.Count == 0)
+        yield return StartCoroutine(matchResolver.ResolveSequential(
+            boardModel,
+            result => scoreByColor = result
+        ));
+
+        if (scoreByColor == null)
         {
-            delay = GameAnimationTiming.PlaceAnimationDuration;
+            scoreByColor = new Dictionary<ColorId, int>();
         }
 
-        yield return new WaitForSeconds(delay);
+        if (scoreByColor.Count == 0)
+        {
+            yield return new WaitForSeconds(GameAnimationTiming.PlaceAnimationDuration);
+        }
 
         if (LevelManager.Instance != null)
         {
@@ -316,6 +323,11 @@ public class BoardManager : MonoBehaviour
             PieceLayout.PlacedPieceY,
             spawnZ
         );
+    }
+
+    public Vector3 GetSpawnWorldPosition()
+    {
+        return GetSpawnWorldPosition(0, 1);
     }
 
     private void SetupCamera()

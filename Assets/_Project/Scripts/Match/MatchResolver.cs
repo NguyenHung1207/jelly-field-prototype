@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -5,27 +7,29 @@ public class MatchResolver
 {
     private const int MaxResolveLoopCount = 20;
 
-    public Dictionary<ColorId, int> Resolve(BoardModel boardModel)
+    public IEnumerator ResolveSequential(
+        BoardModel boardModel,
+        Action<Dictionary<ColorId, int>> onComplete)
     {
         Dictionary<ColorId, int> totalScores = new Dictionary<ColorId, int>();
 
         if (boardModel == null)
-            return totalScores;
+        {
+            onComplete?.Invoke(totalScores);
+            yield break;
+        }
 
         int loopCount = 0;
-        bool hasAnyMatch;
 
-        do
+        while (loopCount < MaxResolveLoopCount)
         {
-            hasAnyMatch = false;
+            bool hasAnyMatch = false;
 
             List<MatchedMiniCell> horizontalMatches = FindHorizontalMatches(boardModel);
 
             if (horizontalMatches.Count > 0)
             {
-                List<MatchedMiniCell> expandedHorizontalMatches = ExpandToConnectedColorGroups(horizontalMatches);
-                Dictionary<ColorId, int> horizontalScores = ApplyMatches(boardModel, expandedHorizontalMatches);
-                MergeScores(totalScores, horizontalScores);
+                yield return ProcessMatchPhase(boardModel, horizontalMatches, totalScores);
                 hasAnyMatch = true;
             }
 
@@ -33,23 +37,107 @@ public class MatchResolver
 
             if (verticalMatches.Count > 0)
             {
-                List<MatchedMiniCell> expandedVerticalMatches = ExpandToConnectedColorGroups(verticalMatches);
-                Dictionary<ColorId, int> verticalScores = ApplyMatches(boardModel, expandedVerticalMatches);
-                MergeScores(totalScores, verticalScores);
+                yield return ProcessMatchPhase(boardModel, verticalMatches, totalScores);
                 hasAnyMatch = true;
             }
 
-            loopCount++;
-
-            if (loopCount >= MaxResolveLoopCount)
-            {
-                Debug.LogWarning("MatchResolver stopped because max loop count was reached.");
+            if (!hasAnyMatch)
                 break;
+
+            loopCount++;
+        }
+
+        if (loopCount >= MaxResolveLoopCount)
+        {
+            Debug.LogWarning("MatchResolver stopped because max loop count was reached.");
+        }
+
+        onComplete?.Invoke(totalScores);
+    }
+
+    private IEnumerator ProcessMatchPhase(
+        BoardModel boardModel,
+        List<MatchedMiniCell> rawMatches,
+        Dictionary<ColorId, int> totalScores)
+    {
+        List<MatchedMiniCell> expandedMatches = ExpandToConnectedColorGroups(rawMatches);
+
+        if (expandedMatches.Count == 0)
+            yield break;
+
+        Dictionary<ColorId, int> phaseScores = CalculateScoreByColor(expandedMatches);
+        MergeScores(totalScores, phaseScores);
+
+        HashSet<PieceView> affectedPieces = new HashSet<PieceView>();
+
+        foreach (MatchedMiniCell match in expandedMatches)
+        {
+            if (match.Piece == null)
+                continue;
+
+            match.Piece.PlayMatchDisappearEffect(match.Slot, match.Color);
+        }
+
+        foreach (MatchedMiniCell match in expandedMatches)
+        {
+            if (match.Piece == null)
+                continue;
+
+            match.Piece.Data.Set(match.Slot, ColorId.None);
+            affectedPieces.Add(match.Piece);
+        }
+
+        foreach (PieceView piece in affectedPieces)
+        {
+            if (piece == null)
+                continue;
+
+            piece.Refresh();
+        }
+
+        yield return new WaitForSeconds(GameAnimationTiming.MatchDisappearDuration);
+
+        List<PieceView> piecesWithFill = new List<PieceView>();
+
+        foreach (PieceView piece in affectedPieces)
+        {
+            if (piece == null)
+                continue;
+
+            List<FillMove> fillMoves = piece.Data.ResolveEmptySlots();
+
+            if (piece.Data.IsEmpty())
+            {
+                boardModel.RemovePiece(piece);
+                UnityEngine.Object.Destroy(piece.gameObject);
+                continue;
             }
 
-        } while (hasAnyMatch);
+            if (fillMoves != null && fillMoves.Count > 0)
+            {
+                piece.PlayFillAnimations(fillMoves);
+                piecesWithFill.Add(piece);
+            }
+            else
+            {
+                piece.Refresh();
+            }
+        }
 
-        return totalScores;
+        if (piecesWithFill.Count > 0)
+        {
+            yield return new WaitForSeconds(GameAnimationTiming.FillAnimationDuration);
+        }
+
+        foreach (PieceView piece in piecesWithFill)
+        {
+            if (piece == null)
+                continue;
+
+            piece.Refresh();
+        }
+
+        yield return new WaitForSeconds(0.05f);
     }
 
     private List<MatchedMiniCell> FindHorizontalMatches(BoardModel boardModel)
@@ -150,6 +238,9 @@ public class MatchResolver
 
         foreach (MatchedMiniCell rawMatch in rawMatches)
         {
+            if (rawMatch.Piece == null)
+                continue;
+
             List<MiniSlot> connectedSlots = GetConnectedSameColorSlots(
                 rawMatch.Piece,
                 rawMatch.Slot,
@@ -229,56 +320,6 @@ public class MatchResolver
         }
     }
 
-    private Dictionary<ColorId, int> ApplyMatches(BoardModel boardModel, List<MatchedMiniCell> matches)
-    {
-        Dictionary<ColorId, int> scoreByColor = CalculateScoreByColor(matches);
-        HashSet<PieceView> affectedPieces = new HashSet<PieceView>();
-
-        foreach (MatchedMiniCell match in matches)
-        {
-            if (match.Piece == null)
-                continue;
-
-            match.Piece.PlayMatchDisappearEffect(match.Slot, match.Color);
-            match.Piece.Data.Set(match.Slot, ColorId.None);
-            affectedPieces.Add(match.Piece);
-        }
-
-        foreach (PieceView piece in affectedPieces)
-        {
-            if (piece == null)
-                continue;
-
-            piece.Refresh();
-
-            List<FillMove> fillMoves = piece.Data.ResolveEmptySlots();
-
-            if (piece.Data.IsEmpty())
-            {
-                boardModel.RemovePiece(piece);
-                piece.DestroyAfterDelay(GameAnimationTiming.MatchDisappearDuration);
-
-                Debug.Log($"Scheduled empty piece removal: {piece.name}");
-                continue;
-            }
-
-            piece.PlayFillAnimationsAfterDelay(
-                fillMoves,
-                GameAnimationTiming.MatchDisappearDuration
-            );
-
-            float finalRefreshDelay =
-                GameAnimationTiming.MatchDisappearDuration +
-                GameAnimationTiming.FillAnimationDuration;
-
-            piece.RefreshAfterDelay(finalRefreshDelay);
-        }
-
-        Debug.Log($"Resolved {matches.Count} mini cells with delayed disappear/fill sequence.");
-
-        return scoreByColor;
-    }
-
     private Dictionary<ColorId, int> CalculateScoreByColor(List<MatchedMiniCell> matches)
     {
         Dictionary<ColorId, HashSet<PieceView>> piecesByColor = new Dictionary<ColorId, HashSet<PieceView>>();
@@ -286,6 +327,9 @@ public class MatchResolver
         foreach (MatchedMiniCell match in matches)
         {
             if (match.Color == ColorId.None)
+                continue;
+
+            if (match.Piece == null)
                 continue;
 
             if (!piecesByColor.ContainsKey(match.Color))
@@ -326,6 +370,9 @@ public class MatchResolver
 
         foreach (MatchedMiniCell match in matches)
         {
+            if (match.Piece == null)
+                continue;
+
             string key = $"{match.Piece.GetInstanceID()}_{match.Slot}";
 
             if (usedKeys.Add(key))

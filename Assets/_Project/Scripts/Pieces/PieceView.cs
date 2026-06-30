@@ -76,13 +76,12 @@ public class PieceView : MonoBehaviour
         Vector3 toPosition = PieceLayout.GetSlotLocalPosition(move.To);
 
         bool horizontal = Mathf.Abs(fromPosition.x - toPosition.x) >
-                        Mathf.Abs(fromPosition.z - toPosition.z);
+                          Mathf.Abs(fromPosition.z - toPosition.z);
 
         Vector3 finalCenter = (fromPosition + toPosition) * 0.5f;
         finalCenter.y += 0.04f;
 
         float distance;
-
         Vector3 fullSize;
 
         if (horizontal)
@@ -120,7 +119,6 @@ public class PieceView : MonoBehaviour
         {
             elapsed += Time.deltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
-
             float easedT = t;
 
             Vector3 scale = fullScale;
@@ -155,50 +153,6 @@ public class PieceView : MonoBehaviour
         }
     }
 
-    public void PlayFillAnimationsAfterDelay(List<FillMove> fillMoves, float delay)
-    {
-        StartCoroutine(PlayFillAnimationsAfterDelayRoutine(fillMoves, delay));
-    }
-
-    private IEnumerator PlayFillAnimationsAfterDelayRoutine(List<FillMove> fillMoves, float delay)
-    {
-        yield return new WaitForSeconds(delay);
-
-        if (this == null || gameObject == null)
-            yield break;
-
-        PlayFillAnimations(fillMoves);
-    }
-
-    public void DestroyAfterDelay(float delay)
-    {
-        StartCoroutine(DestroyAfterDelayRoutine(delay));
-    }
-
-    private IEnumerator DestroyAfterDelayRoutine(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-
-        if (this != null && gameObject != null)
-        {
-            Destroy(gameObject);
-        }
-    }
-
-    public void RefreshAfterDelay(float delay)
-    {
-        StartCoroutine(RefreshAfterDelayRoutine(delay));
-    }
-
-    private IEnumerator RefreshAfterDelayRoutine(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-
-        if (this == null || gameObject == null)
-            yield break;
-
-        Refresh();
-    }
     private List<VisualGroup> BuildVisualGroups()
     {
         List<VisualGroup> groups = new List<VisualGroup>();
@@ -423,9 +377,9 @@ public class PieceView : MonoBehaviour
         );
 
         Vector3 scaleMultiplier = new Vector3(
-        targetSize.x / Mathf.Max(localSize.x, 0.0001f),
-        targetSize.y / Mathf.Max(localSize.y, 0.0001f),
-        targetSize.z / Mathf.Max(localSize.z, 0.0001f)
+            targetSize.x / Mathf.Max(localSize.x, 0.0001f),
+            targetSize.y / Mathf.Max(localSize.y, 0.0001f),
+            targetSize.z / Mathf.Max(localSize.z, 0.0001f)
         );
 
         visualRoot.localScale = Vector3.Scale(visualRoot.localScale, scaleMultiplier);
@@ -466,6 +420,7 @@ public class PieceView : MonoBehaviour
 
         visualBlocks.Clear();
     }
+
     private class VisualGroup
     {
         public readonly ColorId Color;
