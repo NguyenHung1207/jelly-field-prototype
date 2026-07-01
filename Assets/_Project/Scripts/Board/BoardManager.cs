@@ -43,11 +43,14 @@ public class BoardManager : MonoBehaviour
 
     private void Start()
     {
+        Debug.Log("BoardManager Start running.");
+
         ApplyLevelConfig();
+        SetupCamera();
+
         validCells = CreateValidCellMask();
         boardModel = new BoardModel(width, height, validCells);
 
-        SetupCamera();
         CreateBoard();
 
         pieceSpawner = FindFirstObjectByType<PieceSpawner>();
@@ -55,6 +58,11 @@ public class BoardManager : MonoBehaviour
         if (pieceSpawner != null)
         {
             pieceSpawner.Initialize(this);
+            Debug.Log("PieceSpawner initialized by BoardManager.");
+        }
+        else
+        {
+            Debug.LogError("PieceSpawner is missing in scene.");
         }
     }
 
@@ -67,23 +75,11 @@ public class BoardManager : MonoBehaviour
 
     private Material CreateMaterial(string materialName, Color color)
     {
-        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        Material material = MobileSafeMaterial.Create(materialName, color);
 
-        if (shader == null)
+        if (material == null)
         {
-            shader = Shader.Find("Standard");
-        }
-
-        Material material = new Material(shader);
-        material.name = materialName;
-
-        if (material.HasProperty("_BaseColor"))
-        {
-            material.SetColor("_BaseColor", color);
-        }
-        else
-        {
-            material.color = color;
+            Debug.LogError($"Failed to create material: {materialName}");
         }
 
         return material;
@@ -91,15 +87,24 @@ public class BoardManager : MonoBehaviour
 
     private void ApplyLevelConfig()
     {
-        if (LevelManager.Instance == null || LevelManager.Instance.CurrentConfig == null)
+        if (LevelManager.Instance == null)
         {
-            Debug.LogWarning("BoardManager is using fallback board settings because LevelConfig is missing.");
+            Debug.LogWarning("LevelManager is missing. BoardManager is using fallback board settings.");
+            return;
+        }
+
+        if (LevelManager.Instance.CurrentConfig == null)
+        {
+            Debug.LogWarning("Current LevelConfig is missing. BoardManager is using fallback board settings.");
             return;
         }
 
         LevelConfig config = LevelManager.Instance.CurrentConfig;
-        width = config.Width;
-        height = config.Height;
+
+        width = Mathf.Max(1, config.Width);
+        height = Mathf.Max(1, config.Height);
+
+        Debug.Log($"BoardManager applied level config: {width}x{height}");
     }
 
     private bool[,] CreateValidCellMask()
@@ -121,6 +126,12 @@ public class BoardManager : MonoBehaviour
 
         Vector2Int[] blockedCells = LevelManager.Instance.CurrentConfig.BlockedCells;
 
+        if (blockedCells == null)
+        {
+            Debug.LogWarning("BlockedCells is null. Treating as empty blocked cell list.");
+            return mask;
+        }
+
         foreach (Vector2Int blockedCell in blockedCells)
         {
             if (blockedCell.x < 0 || blockedCell.x >= width)
@@ -137,11 +148,18 @@ public class BoardManager : MonoBehaviour
 
     private void CreateBoard()
     {
+        if (boardRoot != null)
+        {
+            Destroy(boardRoot.gameObject);
+        }
+
         GameObject boardRootObject = new GameObject("Generated Board");
         boardRootObject.transform.SetParent(transform, false);
         boardRoot = boardRootObject.transform;
 
         cellRenderers.Clear();
+
+        int createdCellCount = 0;
 
         for (int x = 0; x < width; x++)
         {
@@ -167,8 +185,12 @@ public class BoardManager : MonoBehaviour
 
                 Vector2Int coordinate = new Vector2Int(x, z);
                 cellRenderers[coordinate] = meshRenderer;
+
+                createdCellCount++;
             }
         }
+
+        Debug.Log($"Board created with {createdCellCount} cells.");
     }
 
     public bool TryPlacePiece(PieceView pieceView)
@@ -298,6 +320,9 @@ public class BoardManager : MonoBehaviour
     {
         ClearPlacementPreview();
 
+        if (boardModel == null)
+            return;
+
         int x = Mathf.RoundToInt(worldPosition.x / cellSize);
         int z = Mathf.RoundToInt(worldPosition.z / cellSize);
 
@@ -333,6 +358,9 @@ public class BoardManager : MonoBehaviour
         x = Mathf.RoundToInt(worldPosition.x / cellSize);
         z = Mathf.RoundToInt(worldPosition.z / cellSize);
 
+        if (boardModel == null)
+            return false;
+
         return boardModel.IsValidCell(x, z);
     }
 
@@ -366,18 +394,31 @@ public class BoardManager : MonoBehaviour
         Camera mainCamera = Camera.main;
 
         if (mainCamera == null)
+        {
+            Debug.LogError("Main Camera is missing or not tagged as MainCamera.");
             return;
+        }
 
-        Vector3 boardCenter = new Vector3(
-            (width - 1) * cellSize * 0.5f,
-            0f,
-            (height - 1) * cellSize * 0.5f
-        );
+        float centerX = (width - 1) * cellSize * 0.5f;
+
+        float boardMinZ = 0f;
+        float boardMaxZ = (height - 1) * cellSize;
+        float spawnZ = -1.45f * cellSize;
+
+        float focusZ = (boardMinZ + boardMaxZ + spawnZ) * 0.5f;
+        Vector3 focusPoint = new Vector3(centerX, 0f, focusZ);
+
+        float cameraHeight = 7.0f;
+        Quaternion cameraRotation = Quaternion.Euler(60f, 0f, 0f);
+
+        Vector3 forward = cameraRotation * Vector3.forward;
+        float distanceToGround = cameraHeight / Mathf.Abs(forward.y);
 
         mainCamera.orthographic = true;
-        mainCamera.orthographicSize = Mathf.Max(width, height + 3.8f) * 0.72f;
-        mainCamera.transform.rotation = Quaternion.Euler(60f, 0f, 0f);
-        mainCamera.transform.position = boardCenter + new Vector3(0f, 6f, -6.8f);
-        mainCamera.transform.position += mainCamera.transform.up * 0.85f;
+        mainCamera.orthographicSize = Mathf.Max(width, height + 3.2f) * 0.72f;
+        mainCamera.transform.rotation = cameraRotation;
+        mainCamera.transform.position = focusPoint - forward * distanceToGround;
+
+        Debug.Log($"Camera setup complete. Focus: {focusPoint}, Position: {mainCamera.transform.position}, Size: {mainCamera.orthographicSize}");
     }
 }

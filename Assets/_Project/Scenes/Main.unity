@@ -818,16 +818,16 @@ MonoBehaviour:
   masterVolume: 1
   sfxVolume: 1
   musicVolume: 0.25
-  buttonClip: {fileID: 0}
+  buttonClip: {fileID: 8300000, guid: 403f7ad51b4258942a5f283fd6c7c501, type: 3}
   dragClip: {fileID: 0}
-  placeClip: {fileID: 0}
+  placeClip: {fileID: 8300000, guid: fc681adb1bd52974b897d061b767c9e0, type: 3}
   invalidClip: {fileID: 0}
   matchClip: {fileID: 0}
   fillClip: {fileID: 0}
-  collectClip: {fileID: 0}
-  winClip: {fileID: 0}
-  loseClip: {fileID: 0}
-  backgroundMusicClip: {fileID: 0}
+  collectClip: {fileID: 8300000, guid: cf99426d5c3aedf44941c9d7055c8d60, type: 3}
+  winClip: {fileID: 8300000, guid: 423fdddc9f006ed4383e386b817ebd66, type: 3}
+  loseClip: {fileID: 8300000, guid: 1ae113644171d414ea69628624b3c08c, type: 3}
+  backgroundMusicClip: {fileID: 8300000, guid: ee6f1b482613ccb4b942e9e78433c71c, type: 3}
 --- !u!4 &1938528816
 Transform:
   m_ObjectHideFlags: 0

@@ -5,19 +5,24 @@ public class JellyAnimator : MonoBehaviour
 {
     private Coroutine currentScaleRoutine;
     private Coroutine currentMoveRoutine;
+    private Coroutine currentPlaceRoutine;
 
     private Vector3 baseScale = Vector3.one;
+    private Quaternion baseRotation = Quaternion.identity;
 
     private void Awake()
     {
         baseScale = transform.localScale;
+        baseRotation = transform.localRotation;
     }
 
     public void PlaySpawnAnimation()
     {
+        StopPlaceRoutine();
         StopScaleRoutine();
 
         transform.localScale = baseScale * 0.2f;
+        transform.localRotation = baseRotation;
 
         currentScaleRoutine = StartCoroutine(ScaleSequence(new[]
         {
@@ -29,6 +34,7 @@ public class JellyAnimator : MonoBehaviour
 
     public void SetDraggingVisual(bool isDragging)
     {
+        StopPlaceRoutine();
         StopScaleRoutine();
 
         Vector3 targetScale = isDragging
@@ -41,20 +47,66 @@ public class JellyAnimator : MonoBehaviour
     public void PlayPlaceAnimation()
     {
         StopScaleRoutine();
+        StopMoveRoutine();
+        StopPlaceRoutine();
 
-        currentScaleRoutine = StartCoroutine(ScaleSequence(new[]
-        {
-            new ScaleKey(new Vector3(baseScale.x * 1.18f, baseScale.y * 0.72f, baseScale.z * 1.18f), 0.07f),
-            new ScaleKey(new Vector3(baseScale.x * 0.88f, baseScale.y * 1.18f, baseScale.z * 0.88f), 0.09f),
-            new ScaleKey(new Vector3(baseScale.x * 1.05f, baseScale.y * 0.95f, baseScale.z * 1.05f), 0.07f),
-            new ScaleKey(baseScale, 0.08f)
-        }));
+        currentPlaceRoutine = StartCoroutine(PlaceJellyRoutine());
     }
 
     public void MoveTo(Vector3 targetPosition, float duration)
     {
         StopMoveRoutine();
         currentMoveRoutine = StartCoroutine(MoveToRoutine(targetPosition, duration));
+    }
+
+    private IEnumerator PlaceJellyRoutine()
+    {
+        Vector3 startLocalPosition = transform.localPosition;
+        Quaternion startLocalRotation = transform.localRotation;
+
+        float duration = 0.46f;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+
+            float squash = Mathf.Exp(-t * 5.5f) * Mathf.Sin(t * Mathf.PI * 7.5f);
+            float wobble = Mathf.Exp(-t * 6.2f) * Mathf.Sin(t * Mathf.PI * 9.0f);
+            float bounce = Mathf.Exp(-t * 6.5f) * Mathf.Abs(Mathf.Sin(t * Mathf.PI * 4.0f));
+
+            float scaleX = 1f + squash * 0.18f;
+            float scaleY = 1f - squash * 0.22f;
+            float scaleZ = 1f + squash * 0.18f;
+
+            transform.localScale = new Vector3(
+                baseScale.x * scaleX,
+                baseScale.y * scaleY,
+                baseScale.z * scaleZ
+            );
+
+            float rotationZ = wobble * 5.5f;
+            float rotationX = -wobble * 3.5f;
+
+            transform.localRotation = startLocalRotation * Quaternion.Euler(rotationX, 0f, rotationZ);
+
+            Vector3 offset = new Vector3(
+                wobble * 0.025f,
+                bounce * 0.045f,
+                -wobble * 0.018f
+            );
+
+            transform.localPosition = startLocalPosition + offset;
+
+            yield return null;
+        }
+
+        transform.localScale = baseScale;
+        transform.localRotation = baseRotation;
+        transform.localPosition = startLocalPosition;
+
+        currentPlaceRoutine = null;
     }
 
     private IEnumerator MoveToRoutine(Vector3 targetPosition, float duration)
@@ -123,6 +175,18 @@ public class JellyAnimator : MonoBehaviour
             StopCoroutine(currentMoveRoutine);
             currentMoveRoutine = null;
         }
+    }
+
+    private void StopPlaceRoutine()
+    {
+        if (currentPlaceRoutine != null)
+        {
+            StopCoroutine(currentPlaceRoutine);
+            currentPlaceRoutine = null;
+        }
+
+        transform.localScale = baseScale;
+        transform.localRotation = baseRotation;
     }
 
     private float EaseOutCubic(float t)
