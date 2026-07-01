@@ -1,9 +1,12 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
+    public static UIManager Instance { get; private set; }
+
     [Header("Runtime UI")]
     [SerializeField] private Canvas canvas;
 
@@ -17,10 +20,24 @@ public class UIManager : MonoBehaviour
     private Button nextLevelButton;
 
     private readonly List<GameObject> targetItems = new List<GameObject>();
+    private readonly Dictionary<ColorId, RectTransform> targetIconRects = new Dictionary<ColorId, RectTransform>();
 
     private Sprite roundedPanelSprite;
     private Sprite circleSprite;
     private Sprite roundedSmallSprite;
+
+    private RectTransform canvasRect;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+    }
 
     private void Start()
     {
@@ -32,6 +49,11 @@ public class UIManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+
         if (LevelManager.Instance == null)
             return;
 
@@ -70,6 +92,8 @@ public class UIManager : MonoBehaviour
             canvasObject.AddComponent<CanvasScaler>();
             canvasObject.AddComponent<GraphicRaycaster>();
         }
+
+        canvasRect = canvas.GetComponent<RectTransform>();
 
         SetupCanvasScaler();
         CreateTopUI();
@@ -259,6 +283,7 @@ public class UIManager : MonoBehaviour
         }
 
         targetItems.Clear();
+        targetIconRects.Clear();
 
         IReadOnlyDictionary<ColorId, int> requiredScores = LevelManager.Instance.GetRequiredScores();
         IReadOnlyDictionary<ColorId, int> currentScores = LevelManager.Instance.GetCurrentScores();
@@ -299,6 +324,8 @@ public class UIManager : MonoBehaviour
         iconRect.anchoredPosition = new Vector2(0f, 0f);
         iconRect.sizeDelta = new Vector2(54f, 54f);
 
+        targetIconRects[colorId] = iconRect;
+
         GameObject shine = new GameObject("Icon Shine");
         shine.transform.SetParent(icon.transform, false);
 
@@ -313,7 +340,8 @@ public class UIManager : MonoBehaviour
         shineRect.offsetMin = Vector2.zero;
         shineRect.offsetMax = Vector2.zero;
 
-        Text countText = CreateText("Target Count", item.transform, required.ToString(), 30, TextAnchor.MiddleLeft, Color.white);
+        int remaining = Mathf.Max(0, required - current);
+        Text countText = CreateText("Target Count", item.transform, remaining.ToString(), 30, TextAnchor.MiddleLeft, Color.white);
         countText.fontStyle = FontStyle.Bold;
 
         RectTransform countRect = countText.GetComponent<RectTransform>();
@@ -341,6 +369,180 @@ public class UIManager : MonoBehaviour
         {
             rect.sizeDelta = new Vector2(420f, 74f);
         }
+    }
+
+    public IEnumerator PlayTargetCollectEffects(Dictionary<ColorId, int> scoreByColor, Vector3 worldStartPosition)
+    {
+        if (scoreByColor == null || scoreByColor.Count == 0)
+            yield break;
+
+        if (canvasRect == null)
+            canvasRect = canvas.GetComponent<RectTransform>();
+
+        float longestDelay = 0f;
+        bool hasEffect = false;
+
+        foreach (KeyValuePair<ColorId, int> pair in scoreByColor)
+        {
+            ColorId color = pair.Key;
+            int count = pair.Value;
+
+            if (count <= 0)
+                continue;
+
+            if (!targetIconRects.ContainsKey(color))
+                continue;
+
+            for (int i = 0; i < count; i++)
+            {
+                float delay = i * 0.07f;
+                longestDelay = Mathf.Max(longestDelay, delay);
+                hasEffect = true;
+
+                StartCoroutine(PlaySingleTargetCollectEffect(
+                    color,
+                    worldStartPosition,
+                    targetIconRects[color],
+                    delay
+                ));
+            }
+        }
+
+        if (!hasEffect)
+            yield break;
+
+        yield return new WaitForSeconds(longestDelay + 0.45f);
+    }
+
+    private IEnumerator PlaySingleTargetCollectEffect(ColorId color, Vector3 worldStartPosition, RectTransform targetRect, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+
+        if (targetRect == null)
+            yield break;
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayCollect();
+        }
+
+        GameObject diamond = new GameObject($"Diamond_{color}");
+        diamond.transform.SetParent(canvas.transform, false);
+
+        Image image = diamond.AddComponent<Image>();
+        image.sprite = roundedSmallSprite;
+        image.type = Image.Type.Sliced;
+        image.color = GetUIColor(color);
+
+        RectTransform rect = diamond.GetComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(28f, 28f);
+        rect.localRotation = Quaternion.Euler(0f, 0f, 45f);
+
+        Vector2 startPosition = WorldToCanvasPosition(worldStartPosition);
+        Vector2 targetPosition = GetRectCanvasPosition(targetRect);
+
+        startPosition += new Vector2(Random.Range(-36f, 36f), Random.Range(-18f, 22f));
+
+        rect.anchoredPosition = startPosition;
+        rect.localScale = Vector3.one;
+
+        float duration = 0.38f;
+        float elapsed = 0f;
+
+        while (elapsed < duration && diamond != null)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float easedT = 1f - Mathf.Pow(1f - t, 3f);
+
+            Vector2 arcOffset = new Vector2(0f, Mathf.Sin(t * Mathf.PI) * 90f);
+            rect.anchoredPosition = Vector2.LerpUnclamped(startPosition, targetPosition, easedT) + arcOffset;
+
+            float scale = Mathf.Lerp(1f, 0.45f, easedT);
+            rect.localScale = new Vector3(scale, scale, scale);
+
+            yield return null;
+        }
+
+        if (diamond != null)
+        {
+            Destroy(diamond);
+        }
+
+        StartCoroutine(PulseTarget(targetRect));
+    }
+
+    private IEnumerator PulseTarget(RectTransform targetRect)
+    {
+        if (targetRect == null)
+            yield break;
+
+        Vector3 originalScale = targetRect.localScale;
+        Vector3 punchScale = originalScale * 1.18f;
+
+        float duration = 0.16f;
+        float elapsed = 0f;
+
+        while (elapsed < duration && targetRect != null)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+
+            if (t < 0.5f)
+            {
+                targetRect.localScale = Vector3.Lerp(originalScale, punchScale, t / 0.5f);
+            }
+            else
+            {
+                targetRect.localScale = Vector3.Lerp(punchScale, originalScale, (t - 0.5f) / 0.5f);
+            }
+
+            yield return null;
+        }
+
+        if (targetRect != null)
+        {
+            targetRect.localScale = originalScale;
+        }
+    }
+
+    private Vector2 WorldToCanvasPosition(Vector3 worldPosition)
+    {
+        Camera mainCamera = Camera.main;
+
+        Vector2 screenPosition;
+
+        if (mainCamera != null)
+        {
+            screenPosition = mainCamera.WorldToScreenPoint(worldPosition);
+        }
+        else
+        {
+            screenPosition = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        }
+
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            canvasRect,
+            screenPosition,
+            null,
+            out Vector2 canvasPosition
+        );
+
+        return canvasPosition;
+    }
+
+    private Vector2 GetRectCanvasPosition(RectTransform targetRect)
+    {
+        Vector3 screenPosition = RectTransformUtility.WorldToScreenPoint(null, targetRect.position);
+
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            canvasRect,
+            screenPosition,
+            null,
+            out Vector2 canvasPosition
+        );
+
+        return canvasPosition;
     }
 
     private void CreateResultPanel()
@@ -408,6 +610,14 @@ public class UIManager : MonoBehaviour
 
         Button button = buttonObject.AddComponent<Button>();
 
+        button.onClick.AddListener(() =>
+        {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayButton();
+            }
+        });
+
         RectTransform buttonRect = button.GetComponent<RectTransform>();
         buttonRect.anchorMin = anchorMin;
         buttonRect.anchorMax = anchorMax;
@@ -422,6 +632,11 @@ public class UIManager : MonoBehaviour
 
     private void ShowLevelComplete()
     {
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayWin();
+        }
+
         resultTitleText.text = "LEVEL COMPLETE!";
         nextLevelButton.gameObject.SetActive(LevelManager.Instance != null && LevelManager.Instance.HasNextLevel);
         resultPanel.SetActive(true);
@@ -429,6 +644,11 @@ public class UIManager : MonoBehaviour
 
     private void ShowLevelFailed()
     {
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayLose();
+        }
+
         resultTitleText.text = "LEVEL FAILED!";
         nextLevelButton.gameObject.SetActive(false);
         resultPanel.SetActive(true);

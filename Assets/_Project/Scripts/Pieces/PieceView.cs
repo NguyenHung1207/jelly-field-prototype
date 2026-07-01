@@ -110,6 +110,11 @@ public class PieceView : MonoBehaviour
             move.Color
         );
 
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayFill();
+        }
+
         Vector3 fullScale = fillGhost.transform.localScale;
 
         float duration = GameAnimationTiming.FillAnimationDuration;

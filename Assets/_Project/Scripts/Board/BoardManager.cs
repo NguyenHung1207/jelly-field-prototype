@@ -182,10 +182,22 @@ public class BoardManager : MonoBehaviour
             return false;
 
         if (!TryGetGridPositionFromWorld(pieceView.transform.position, out int x, out int z))
+        {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayInvalid();
+            }
+
             return false;
+        }
 
         if (!boardModel.CanPlace(x, z))
         {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayInvalid();
+            }
+
             Debug.LogWarning($"Cannot place at ({x}, {z}). Cell is invalid or occupied.");
             return false;
         }
@@ -211,6 +223,11 @@ public class BoardManager : MonoBehaviour
         }
 
         Debug.Log($"Placed piece at ({x}, {z})");
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayPlace();
+        }
 
         StartCoroutine(FinishTurnSequence(pieceView));
 
@@ -240,6 +257,20 @@ public class BoardManager : MonoBehaviour
 
         if (LevelManager.Instance != null)
         {
+            if (scoreByColor.Count > 0 && AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayMatch();
+            }
+
+            if (UIManager.Instance != null)
+            {
+                Vector3 effectStartPosition = placedPieceView != null
+                    ? placedPieceView.transform.position
+                    : Vector3.zero;
+
+                yield return StartCoroutine(UIManager.Instance.PlayTargetCollectEffects(scoreByColor, effectStartPosition));
+            }
+
             LevelManager.Instance.AddScores(scoreByColor);
 
             if (!LevelManager.Instance.IsLevelEnded && boardModel.IsFull())
@@ -347,7 +378,6 @@ public class BoardManager : MonoBehaviour
         mainCamera.orthographicSize = Mathf.Max(width, height + 3.8f) * 0.72f;
         mainCamera.transform.rotation = Quaternion.Euler(60f, 0f, 0f);
         mainCamera.transform.position = boardCenter + new Vector3(0f, 6f, -6.8f);
-
         mainCamera.transform.position += mainCamera.transform.up * 0.85f;
     }
 }

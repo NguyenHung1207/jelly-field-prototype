@@ -7,9 +7,15 @@ public class MatchResolver
 {
     private const int MaxResolveLoopCount = 20;
 
-    public IEnumerator ResolveSequential(
-        BoardModel boardModel,
-        Action<Dictionary<ColorId, int>> onComplete)
+    private readonly MiniSlot[] allSlots =
+    {
+        MiniSlot.TopLeft,
+        MiniSlot.TopRight,
+        MiniSlot.BottomLeft,
+        MiniSlot.BottomRight
+    };
+
+    public IEnumerator ResolveSequential(BoardModel boardModel, Action<Dictionary<ColorId, int>> onComplete)
     {
         Dictionary<ColorId, int> totalScores = new Dictionary<ColorId, int>();
 
@@ -23,26 +29,15 @@ public class MatchResolver
 
         while (loopCount < MaxResolveLoopCount)
         {
-            bool hasAnyMatch = false;
+            List<MatchedMiniCell> matches = FindAllConnectedMatches(boardModel);
 
-            List<MatchedMiniCell> horizontalMatches = FindHorizontalMatches(boardModel);
-
-            if (horizontalMatches.Count > 0)
-            {
-                yield return ProcessMatchPhase(boardModel, horizontalMatches, totalScores);
-                hasAnyMatch = true;
-            }
-
-            List<MatchedMiniCell> verticalMatches = FindVerticalMatches(boardModel);
-
-            if (verticalMatches.Count > 0)
-            {
-                yield return ProcessMatchPhase(boardModel, verticalMatches, totalScores);
-                hasAnyMatch = true;
-            }
-
-            if (!hasAnyMatch)
+            if (matches.Count == 0)
                 break;
+
+            Dictionary<ColorId, int> phaseScores = CalculateScoreByColor(matches);
+            MergeScores(totalScores, phaseScores);
+
+            yield return ProcessMatchedCells(boardModel, matches);
 
             loopCount++;
         }
@@ -55,246 +50,124 @@ public class MatchResolver
         onComplete?.Invoke(totalScores);
     }
 
-    private IEnumerator ProcessMatchPhase(
-        BoardModel boardModel,
-        List<MatchedMiniCell> rawMatches,
-        Dictionary<ColorId, int> totalScores)
+    private List<MatchedMiniCell> FindAllConnectedMatches(BoardModel boardModel)
     {
-        List<MatchedMiniCell> expandedMatches = ExpandToConnectedColorGroups(rawMatches);
-
-        if (expandedMatches.Count == 0)
-            yield break;
-
-        Dictionary<ColorId, int> phaseScores = CalculateScoreByColor(expandedMatches);
-        MergeScores(totalScores, phaseScores);
-
-        HashSet<PieceView> affectedPieces = new HashSet<PieceView>();
-
-        foreach (MatchedMiniCell match in expandedMatches)
-        {
-            if (match.Piece == null)
-                continue;
-
-            match.Piece.PlayMatchDisappearEffect(match.Slot, match.Color);
-        }
-
-        foreach (MatchedMiniCell match in expandedMatches)
-        {
-            if (match.Piece == null)
-                continue;
-
-            match.Piece.Data.Set(match.Slot, ColorId.None);
-            affectedPieces.Add(match.Piece);
-        }
-
-        foreach (PieceView piece in affectedPieces)
-        {
-            if (piece == null)
-                continue;
-
-            piece.Refresh();
-        }
-
-        yield return new WaitForSeconds(GameAnimationTiming.MatchDisappearDuration);
-
-        List<PieceView> piecesWithFill = new List<PieceView>();
-
-        foreach (PieceView piece in affectedPieces)
-        {
-            if (piece == null)
-                continue;
-
-            List<FillMove> fillMoves = piece.Data.ResolveEmptySlots();
-
-            if (piece.Data.IsEmpty())
-            {
-                boardModel.RemovePiece(piece);
-                UnityEngine.Object.Destroy(piece.gameObject);
-                continue;
-            }
-
-            if (fillMoves != null && fillMoves.Count > 0)
-            {
-                piece.PlayFillAnimations(fillMoves);
-                piecesWithFill.Add(piece);
-            }
-            else
-            {
-                piece.Refresh();
-            }
-        }
-
-        if (piecesWithFill.Count > 0)
-        {
-            yield return new WaitForSeconds(GameAnimationTiming.FillAnimationDuration);
-        }
-
-        foreach (PieceView piece in piecesWithFill)
-        {
-            if (piece == null)
-                continue;
-
-            piece.Refresh();
-        }
-
-        yield return new WaitForSeconds(0.05f);
-    }
-
-    private List<MatchedMiniCell> FindHorizontalMatches(BoardModel boardModel)
-    {
-        List<MatchedMiniCell> matches = new List<MatchedMiniCell>();
+        List<MatchedMiniCell> result = new List<MatchedMiniCell>();
+        HashSet<string> globalVisited = new HashSet<string>();
+        HashSet<string> addedMatches = new HashSet<string>();
 
         for (int z = 0; z < boardModel.Height; z++)
         {
-            for (int x = 0; x < boardModel.Width - 1; x++)
+            for (int x = 0; x < boardModel.Width; x++)
             {
-                PieceView leftPiece = boardModel.GetPiece(x, z);
-                PieceView rightPiece = boardModel.GetPiece(x + 1, z);
+                PieceView piece = boardModel.GetPiece(x, z);
 
-                if (leftPiece == null || rightPiece == null)
+                if (piece == null || piece.Data == null)
                     continue;
 
-                TryAddPairMatch(
-                    matches,
-                    leftPiece,
-                    MiniSlot.TopRight,
-                    rightPiece,
-                    MiniSlot.TopLeft
-                );
+                foreach (MiniSlot slot in allSlots)
+                {
+                    ColorId color = piece.Data.Get(slot);
 
-                TryAddPairMatch(
-                    matches,
-                    leftPiece,
-                    MiniSlot.BottomRight,
-                    rightPiece,
-                    MiniSlot.BottomLeft
-                );
-            }
-        }
+                    if (color == ColorId.None)
+                        continue;
 
-        return RemoveDuplicateMatches(matches);
-    }
+                    MiniNode startNode = new MiniNode(x, z, piece, slot, color);
+                    string startKey = startNode.Key;
 
-    private List<MatchedMiniCell> FindVerticalMatches(BoardModel boardModel)
-    {
-        List<MatchedMiniCell> matches = new List<MatchedMiniCell>();
+                    if (globalVisited.Contains(startKey))
+                        continue;
 
-        for (int x = 0; x < boardModel.Width; x++)
-        {
-            for (int z = 0; z < boardModel.Height - 1; z++)
-            {
-                PieceView bottomPiece = boardModel.GetPiece(x, z);
-                PieceView topPiece = boardModel.GetPiece(x, z + 1);
+                    List<MiniNode> component = new List<MiniNode>();
+                    Queue<MiniNode> queue = new Queue<MiniNode>();
+                    bool hasExternalTouch = false;
 
-                if (bottomPiece == null || topPiece == null)
-                    continue;
+                    queue.Enqueue(startNode);
+                    globalVisited.Add(startKey);
 
-                TryAddPairMatch(
-                    matches,
-                    bottomPiece,
-                    MiniSlot.TopLeft,
-                    topPiece,
-                    MiniSlot.BottomLeft
-                );
+                    while (queue.Count > 0)
+                    {
+                        MiniNode current = queue.Dequeue();
+                        component.Add(current);
 
-                TryAddPairMatch(
-                    matches,
-                    bottomPiece,
-                    MiniSlot.TopRight,
-                    topPiece,
-                    MiniSlot.BottomRight
-                );
-            }
-        }
+                        foreach (NeighborResult neighborResult in GetSameColorNeighbors(boardModel, current))
+                        {
+                            if (neighborResult.IsExternal)
+                            {
+                                hasExternalTouch = true;
+                            }
 
-        return RemoveDuplicateMatches(matches);
-    }
+                            MiniNode neighbor = neighborResult.Node;
+                            string neighborKey = neighbor.Key;
 
-    private void TryAddPairMatch(
-        List<MatchedMiniCell> matches,
-        PieceView pieceA,
-        MiniSlot slotA,
-        PieceView pieceB,
-        MiniSlot slotB)
-    {
-        ColorId colorA = pieceA.Data.Get(slotA);
-        ColorId colorB = pieceB.Data.Get(slotB);
+                            if (globalVisited.Contains(neighborKey))
+                                continue;
 
-        if (colorA == ColorId.None || colorB == ColorId.None)
-            return;
+                            globalVisited.Add(neighborKey);
+                            queue.Enqueue(neighbor);
+                        }
+                    }
 
-        if (colorA != colorB)
-            return;
+                    if (!hasExternalTouch)
+                        continue;
 
-        matches.Add(new MatchedMiniCell(pieceA, slotA, colorA));
-        matches.Add(new MatchedMiniCell(pieceB, slotB, colorB));
+                    foreach (MiniNode node in component)
+                    {
+                        string matchKey = node.Key;
 
-        Debug.Log($"Matched {colorA}: {pieceA.name}.{slotA} <-> {pieceB.name}.{slotB}");
-    }
+                        if (!addedMatches.Add(matchKey))
+                            continue;
 
-    private List<MatchedMiniCell> ExpandToConnectedColorGroups(List<MatchedMiniCell> rawMatches)
-    {
-        List<MatchedMiniCell> expandedMatches = new List<MatchedMiniCell>();
-
-        foreach (MatchedMiniCell rawMatch in rawMatches)
-        {
-            if (rawMatch.Piece == null)
-                continue;
-
-            List<MiniSlot> connectedSlots = GetConnectedSameColorSlots(
-                rawMatch.Piece,
-                rawMatch.Slot,
-                rawMatch.Color
-            );
-
-            foreach (MiniSlot connectedSlot in connectedSlots)
-            {
-                expandedMatches.Add(new MatchedMiniCell(
-                    rawMatch.Piece,
-                    connectedSlot,
-                    rawMatch.Color
-                ));
-            }
-        }
-
-        return RemoveDuplicateMatches(expandedMatches);
-    }
-
-    private List<MiniSlot> GetConnectedSameColorSlots(PieceView piece, MiniSlot startSlot, ColorId color)
-    {
-        List<MiniSlot> result = new List<MiniSlot>();
-        Queue<MiniSlot> queue = new Queue<MiniSlot>();
-        HashSet<MiniSlot> visited = new HashSet<MiniSlot>();
-
-        queue.Enqueue(startSlot);
-        visited.Add(startSlot);
-
-        while (queue.Count > 0)
-        {
-            MiniSlot currentSlot = queue.Dequeue();
-
-            if (piece.Data.Get(currentSlot) != color)
-                continue;
-
-            result.Add(currentSlot);
-
-            foreach (MiniSlot neighborSlot in GetNeighborSlots(currentSlot))
-            {
-                if (visited.Contains(neighborSlot))
-                    continue;
-
-                if (piece.Data.Get(neighborSlot) != color)
-                    continue;
-
-                visited.Add(neighborSlot);
-                queue.Enqueue(neighborSlot);
+                        result.Add(new MatchedMiniCell(node.Piece, node.Slot, node.Color));
+                    }
+                }
             }
         }
 
         return result;
     }
 
-    private IEnumerable<MiniSlot> GetNeighborSlots(MiniSlot slot)
+    private IEnumerable<NeighborResult> GetSameColorNeighbors(BoardModel boardModel, MiniNode node)
+    {
+        foreach (MiniSlot internalSlot in GetInternalNeighborSlots(node.Slot))
+        {
+            ColorId internalColor = node.Piece.Data.Get(internalSlot);
+
+            if (internalColor == node.Color)
+            {
+                yield return new NeighborResult(
+                    new MiniNode(node.X, node.Z, node.Piece, internalSlot, node.Color),
+                    false
+                );
+            }
+        }
+
+        foreach (ExternalNeighbor externalNeighbor in GetExternalNeighbors(node.Slot))
+        {
+            int neighborX = node.X + externalNeighbor.OffsetX;
+            int neighborZ = node.Z + externalNeighbor.OffsetZ;
+
+            if (!boardModel.IsInsideBounds(neighborX, neighborZ))
+                continue;
+
+            PieceView neighborPiece = boardModel.GetPiece(neighborX, neighborZ);
+
+            if (neighborPiece == null || neighborPiece.Data == null)
+                continue;
+
+            ColorId neighborColor = neighborPiece.Data.Get(externalNeighbor.TargetSlot);
+
+            if (neighborColor != node.Color)
+                continue;
+
+            yield return new NeighborResult(
+                new MiniNode(neighborX, neighborZ, neighborPiece, externalNeighbor.TargetSlot, node.Color),
+                true
+            );
+        }
+    }
+
+    private IEnumerable<MiniSlot> GetInternalNeighborSlots(MiniSlot slot)
     {
         switch (slot)
         {
@@ -320,16 +193,106 @@ public class MatchResolver
         }
     }
 
+    private IEnumerable<ExternalNeighbor> GetExternalNeighbors(MiniSlot slot)
+    {
+        switch (slot)
+        {
+            case MiniSlot.TopLeft:
+                yield return new ExternalNeighbor(-1, 0, MiniSlot.TopRight);
+                yield return new ExternalNeighbor(0, 1, MiniSlot.BottomLeft);
+                break;
+
+            case MiniSlot.TopRight:
+                yield return new ExternalNeighbor(1, 0, MiniSlot.TopLeft);
+                yield return new ExternalNeighbor(0, 1, MiniSlot.BottomRight);
+                break;
+
+            case MiniSlot.BottomLeft:
+                yield return new ExternalNeighbor(-1, 0, MiniSlot.BottomRight);
+                yield return new ExternalNeighbor(0, -1, MiniSlot.TopLeft);
+                break;
+
+            case MiniSlot.BottomRight:
+                yield return new ExternalNeighbor(1, 0, MiniSlot.BottomLeft);
+                yield return new ExternalNeighbor(0, -1, MiniSlot.TopRight);
+                break;
+        }
+    }
+
+    private IEnumerator ProcessMatchedCells(BoardModel boardModel, List<MatchedMiniCell> matches)
+    {
+        HashSet<PieceView> affectedPieces = new HashSet<PieceView>();
+
+        foreach (MatchedMiniCell match in matches)
+        {
+            if (match.Piece == null || match.Piece.Data == null)
+                continue;
+
+            match.Piece.PlayMatchDisappearEffect(match.Slot, match.Color);
+            match.Piece.Data.Set(match.Slot, ColorId.None);
+            affectedPieces.Add(match.Piece);
+        }
+
+        foreach (PieceView piece in affectedPieces)
+        {
+            if (piece != null)
+            {
+                piece.Refresh();
+            }
+        }
+
+        yield return new WaitForSeconds(GameAnimationTiming.MatchDisappearDuration);
+
+        List<PieceView> piecesToRefreshAfterFill = new List<PieceView>();
+        bool hasFillAnimation = false;
+
+        foreach (PieceView piece in affectedPieces)
+        {
+            if (piece == null || piece.Data == null)
+                continue;
+
+            if (piece.Data.IsEmpty())
+            {
+                boardModel.RemovePiece(piece);
+                UnityEngine.Object.Destroy(piece.gameObject);
+                continue;
+            }
+
+            List<FillMove> fillMoves = piece.Data.ResolveEmptySlots();
+
+            if (fillMoves != null && fillMoves.Count > 0)
+            {
+                piece.PlayFillAnimations(fillMoves);
+                piecesToRefreshAfterFill.Add(piece);
+                hasFillAnimation = true;
+            }
+            else
+            {
+                piece.Refresh();
+            }
+        }
+
+        if (hasFillAnimation)
+        {
+            yield return new WaitForSeconds(GameAnimationTiming.FillAnimationDuration);
+        }
+
+        foreach (PieceView piece in piecesToRefreshAfterFill)
+        {
+            if (piece != null)
+            {
+                piece.Refresh();
+            }
+        }
+    }
+
     private Dictionary<ColorId, int> CalculateScoreByColor(List<MatchedMiniCell> matches)
     {
         Dictionary<ColorId, HashSet<PieceView>> piecesByColor = new Dictionary<ColorId, HashSet<PieceView>>();
 
         foreach (MatchedMiniCell match in matches)
         {
-            if (match.Color == ColorId.None)
-                continue;
-
-            if (match.Piece == null)
+            if (match.Color == ColorId.None || match.Piece == null)
                 continue;
 
             if (!piecesByColor.ContainsKey(match.Color))
@@ -363,24 +326,63 @@ public class MatchResolver
         }
     }
 
-    private List<MatchedMiniCell> RemoveDuplicateMatches(List<MatchedMiniCell> matches)
+    private class MatchedMiniCell
     {
-        List<MatchedMiniCell> uniqueMatches = new List<MatchedMiniCell>();
-        HashSet<string> usedKeys = new HashSet<string>();
+        public readonly PieceView Piece;
+        public readonly MiniSlot Slot;
+        public readonly ColorId Color;
 
-        foreach (MatchedMiniCell match in matches)
+        public MatchedMiniCell(PieceView piece, MiniSlot slot, ColorId color)
         {
-            if (match.Piece == null)
-                continue;
-
-            string key = $"{match.Piece.GetInstanceID()}_{match.Slot}";
-
-            if (usedKeys.Add(key))
-            {
-                uniqueMatches.Add(match);
-            }
+            Piece = piece;
+            Slot = slot;
+            Color = color;
         }
+    }
 
-        return uniqueMatches;
+    private struct MiniNode
+    {
+        public readonly int X;
+        public readonly int Z;
+        public readonly PieceView Piece;
+        public readonly MiniSlot Slot;
+        public readonly ColorId Color;
+
+        public string Key => $"{X}_{Z}_{Slot}";
+
+        public MiniNode(int x, int z, PieceView piece, MiniSlot slot, ColorId color)
+        {
+            X = x;
+            Z = z;
+            Piece = piece;
+            Slot = slot;
+            Color = color;
+        }
+    }
+
+    private struct NeighborResult
+    {
+        public readonly MiniNode Node;
+        public readonly bool IsExternal;
+
+        public NeighborResult(MiniNode node, bool isExternal)
+        {
+            Node = node;
+            IsExternal = isExternal;
+        }
+    }
+
+    private struct ExternalNeighbor
+    {
+        public readonly int OffsetX;
+        public readonly int OffsetZ;
+        public readonly MiniSlot TargetSlot;
+
+        public ExternalNeighbor(int offsetX, int offsetZ, MiniSlot targetSlot)
+        {
+            OffsetX = offsetX;
+            OffsetZ = offsetZ;
+            TargetSlot = targetSlot;
+        }
     }
 }
